@@ -1,0 +1,52 @@
+{
+  "name": "my-ai-agent",
+  "displayName": "My AI Agent",
+  "description": "An AI agent to help create files and code.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.102.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "my-ai-agent-sidebar",
+          "title": "My AI Agent",
+          "icon": "$(sparkle)"
+        }
+      ]
+    },
+    "views": {
+      "my-ai-agent-sidebar": [
+        {
+          "id": "my-ai-agent.chatView",
+          "name": "Chat",
+          "type": "webview",
+          "contextualTitle": "AI Agent Chat"
+
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "lint": "eslint .",
+    "pretest": "npm run lint",
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.102.0",
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
+    "@types/node": "18.x",
+    "eslint": "^8.57.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.3.0",
+    "typescript": "^5.4.5",
+    "@vscode/test-electron": "^2.3.9"
+  }
+}
+
