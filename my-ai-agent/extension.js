@@ -1,336 +1,19 @@
-// // The module 'vscode' contains the VS Code extensibility API
-// // Import the module and reference it with the alias vscode in your code below
-// const vscode = require('vscode');
-
-// // This method is called when your extension is activated
-// // Your extension is activated the very first time the command is executed
-
-// /**
-//  * @param {vscode.ExtensionContext} context
-//  */
-// function activate(context) {
-
-// 	// Use the console to output diagnostic information (console.log) and errors (console.error)
-// 	// This line of code will only be executed once when your extension is activated
-// 	console.log('Congratulations, your extension "my-ai-agent" is now active!');
-
-// 	// The command has been defined in the package.json file
-// 	// Now provide the implementation of the command with  registerCommand
-// 	// The commandId parameter must match the command field in package.json
-// 	const disposable = vscode.commands.registerCommand('my-ai-agent.helloWorld', function () {
-// 		// The code you place here will be executed every time your command is executed
-// 		console.log('### hello bhaii Executing Hello World command from my-ai-agent extension.');
-// 		// Display a message box to the user
-// 		vscode.window.showInformationMessage('Hello World from my-ai-agent!');
-// 	});
-// 	let disposable2 = vscode.commands.registerCommand('my-ai-agent.createFile', async () => {
-
-// 		console.log('### Executing Create File command from my-ai-agent extension.');
-// 		vscode.window.showInformationMessage('Creating file using AI Agent...');
-		
-// 		// 1. Get the user's open folder (workspace)
-// 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-// 		if (!workspaceFolder) {
-// 		  vscode.window.showErrorMessage('You must have a folder open to use this extension.');
-// 		  return;
-// 		}
-// 		const workspaceUri = workspaceFolder.uri;
-
-// 		// 2. Ask the user for instructions
-// 		const userPrompt = await vscode.window.showInputBox({
-// 		  prompt: 'What file should I create and what code should it contain?',
-// 		  placeHolder: 'e.g., "Create a python file app.py that prints hello world"',
-// 		});
-
-// 		if (!userPrompt) {
-// 		  vscode.window.showInformationMessage('Command cancelled.');
-// 		  return;
-// 		}
-
-// 		createFileInWorkspace(workspaceUri, "hello.txt", "This is a test file created by AI Agent.");
-
-// 		// Show a loading message
-// 		vscode.window.withProgress({
-// 		  location: vscode.ProgressLocation.Notification,
-// 		  title: 'AI Agent is working...',
-// 		  cancellable: false
-// 		}, async (progress) => {
-
-// 		  try {
-// 		    // 3. Call the AI agent
-// 		    progress.report({ message: 'Contacting AI...' });
-// 		    // const aiResponse = await callAIAgent(userPrompt);
-
-// 			console.log("User Prompt: ", userPrompt);
-
-// 			sleep(2000);
-
-// 		    // if (aiResponse && aiResponse.fileName && typeof aiResponse.content === 'string') {
-
-// 		    //   // 4. Create and write the file
-// 		    //   progress.report({ message: `Creating file: ${aiResponse.fileName}` });
-// 		    //   await createFileInWorkspace(workspaceUri, aiResponse.fileName, aiResponse.content);
-			
-// 		    //   vscode.window.showInformationMessage(`Successfully created ${aiResponse.fileName}!`);
-// 		    // } else {
-// 		    //   throw new Error('Received invalid response from AI.');
-// 		    // }
-
-			
-// 		  } catch (error) {
-// 		    console.error(error);
-// 		    vscode.window.showErrorMessage(`Error communicating with AI: ${error instanceof Error ? error.message : 'Unknown error'}`);
-// 		  }
-// 		});
-// 	});
-
-// 	context.subscriptions.push(disposable, disposable2);
-// }
-
-
-// // This method is called when your extension is deactivated
-// function deactivate() {}
-
-// module.exports = {
-// 	activate,
-// 	deactivate
-// }
-// // 
-
-// // import * as vscode from 'vscode';
-// // import { TextEncoder } from 'util'; // Use Node.js util for TextEncoder
-
-// // // --- Gemini API Configuration ---
-// // const GEMINI_API_KEY = ""; // Leave this as-is
-// // const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${GEMINI_API_KEY}`;
-
-
-// // // Define the JSON schema for the AI's response
-// // const RESPONSE_SCHEMA = {
-// //   type: "OBJECT",
-// //   properties: {
-// //     "fileName": {
-// //       "type": "STRING",
-// //       "description": "The relative path for the file to be created, e.g., 'src/app.js' or 'index.html'."
-// //     },
-// //     "content": {
-// //       "type": "STRING",
-// //       "description": "The code or text content to be written into the file. All code should be complete."
-// //     }
-// //   },
-// //   required: ["fileName", "content"]
-// // };
-
-// // /**
-// //  * This is the main entry point for your extension.
-// //  * It's called when your extension is activated (e.g., when the command is run).
-// //  */
-// // export function activate(context) {
-
-// //   // Register the command from package.json
-// //   let disposable = vscode.commands.registerCommand('my-ai-agent.createFile', async () => {
-
-// // 	console.log('### Executing Create File command from my-ai-agent extension.');
-// // 	vscode.window.showInformationMessage('Creating file using AI Agent...');
-    
-// //     // // 1. Get the user's open folder (workspace)
-// //     // const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-// //     // if (!workspaceFolder) {
-// //     //   vscode.window.showErrorMessage('You must have a folder open to use this extension.');
-// //     //   return;
-// //     // }
-// //     // const workspaceUri = workspaceFolder.uri;
-
-// //     // // 2. Ask the user for instructions
-// //     // const userPrompt = await vscode.window.showInputBox({
-// //     //   prompt: 'What file should I create and what code should it contain?',
-// //     //   placeHolder: 'e.g., "Create a python file app.py that prints hello world"',
-// //     // });
-
-// //     // if (!userPrompt) {
-// //     //   vscode.window.showInformationMessage('Command cancelled.');
-// //     //   return;
-// //     // }
-
-// //     // // Show a loading message
-// //     // vscode.window.withProgress({
-// //     //   location: vscode.ProgressLocation.Notification,
-// //     //   title: 'AI Agent is working...',
-// //     //   cancellable: false
-// //     // }, async (progress) => {
-
-// //     //   try {
-// //     //     // 3. Call the AI agent
-// //     //     progress.report({ message: 'Contacting AI...' });
-// //     //     // const aiResponse = await callAIAgent(userPrompt);
-
-// // 	// 	console.log("User Prompt: ", userPrompt);
-
-// // 	// 	sleep(2000);
-
-// //     //     // if (aiResponse && aiResponse.fileName && typeof aiResponse.content === 'string') {
-
-// //     //     //   // 4. Create and write the file
-// //     //     //   progress.report({ message: `Creating file: ${aiResponse.fileName}` });
-// //     //     //   await createFileInWorkspace(workspaceUri, aiResponse.fileName, aiResponse.content);
-          
-// //     //     //   vscode.window.showInformationMessage(`Successfully created ${aiResponse.fileName}!`);
-// //     //     // } else {
-// //     //     //   throw new Error('Received invalid response from AI.');
-// //     //     // }
-
-		
-// //     //   } catch (error) {
-// //     //     console.error(error);
-// //     //     vscode.window.showErrorMessage(`Error communicating with AI: ${error instanceof Error ? error.message : 'Unknown error'}`);
-// //     //   }
-// //     // });
-// //   });
-
-// //   context.subscriptions.push(disposable);
-// // }
-
-// // /**
-// //  * Calls the Gemini API to get file instructions.
-// //  * @param userPrompt The user's text prompt.
-// //  * @returns A structured AIFileResponse.
-// //  */
-// async function callAIAgent(userPrompt) {
-//   const systemInstruction = `You are an expert programmer and file system agent. 
-//   The user will give you a prompt to create a file. 
-//   You MUST respond ONLY with a single, valid JSON object that matches the following schema.
-//   Do not include markdown, backticks, or any text outside of the JSON object.
-//   The 'content' field must contain the full code for the file, correctly formatted.`;
-
-//   const payload = {
-//     contents: [{
-//       parts: [{ text: userPrompt }]
-//     }],
-//     systemInstruction: {
-//       parts: [{ text: systemInstruction }]
-//     },
-//     generationConfig: {
-//       responseMimeType: "application/json",
-//       responseSchema: RESPONSE_SCHEMA,
-//     }
-//   };
-
-//   // Call API with exponential backoff
-//   let response;
-//   let retries = 0;
-//   const maxRetries = 3;
-
-//   while (retries < maxRetries) {
-//     try {
-//       response = await fetch(GEMINI_API_URL, {
-//         method: 'POST',
-//         headers: { 'Content-Type': 'application/json' },
-//         body: JSON.stringify(payload)
-//       });
-
-//       if (response.ok) {
-//         break; // Success
-//       }
-
-//       if (response.status === 429 || response.status >= 500) {
-//         // Throttling or server error, wait and retry
-//         const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
-//         await new Promise(resolve => setTimeout(resolve, delay));
-//         retries++;
-//       } else {
-//         // Other client error
-//         throw new Error(`API request failed with status ${response.status}: ${await response.text()}`);
-//       }
-
-//     } catch (error) {
-//       if (retries + 1 >= maxRetries) {
-//         throw error; // Max retries reached
-//       }
-//       const delay = Math.pow(2, retries) * 1000 + Math.random() * 1000;
-//       await new Promise(resolve => setTimeout(resolve, delay));
-//       retries++;
-//     }
-//   }
-
-// //   // @ts-ignore
-// //   if (!response.ok) {
-// //     throw new Error(`API request failed after retries with status ${response.status}`);
-// //   }
-
-// //   const result = await response.json();
-// //   const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
-
-// //   if (!text) {
-// //     throw new Error('No text response from AI.');
-// //   }
-
-// //   try {
-// //     // The AI's response text *is* the JSON object
-// //     return JSON.parse(text) ;
-// //   } catch (e) {
-// //     console.error("Failed to parse AI JSON response:", text);
-// //     throw new Error('AI returned malformed JSON.');
-// //   }
-// }
-
-// /**
-//  * Creates a file in the workspace and opens it.
-//  * @param workspaceUri The URI of the root workspace folder.
-//  * @param fileName The relative path of the file to create.
-//  * @param content The string content to write to the file.
-//  */
-// async function createFileInWorkspace(workspaceUri, fileName, content) {
-//   try {
-//     // 1. Get the full URI for the new file
-//     const fileUri = vscode.Uri.joinPath(workspaceUri, fileName);
-
-//     // 2. Convert string content to Uint8Array (required by fs.writeFile)
-//     const encodedContent = new TextEncoder().encode(content);
-
-//     // 3. Write the file
-//     // This will create directories if they don't exist and overwrite the file if it does.
-//     await vscode.workspace.fs.writeFile(fileUri, encodedContent);
-
-//     // 4. Open the new file in the editor
-//     const document = await vscode.workspace.openTextDocument(fileUri);
-//     await vscode.window.showTextDocument(document);
-
-//   } catch (error) {
-//     console.error(error);
-//     vscode.window.showErrorMessage(`Failed to create file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-//   }
-// }
-
-// // This function is called when your extension is deactivated
-// // export function deactivate() {}
-// function sleep(ms) {
-// 	// Returns a promise that resolves after `ms` milliseconds.
-// 	// Use: await sleep(2000);
-// 	return new Promise(resolve => setTimeout(resolve, ms));
-// }
-
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-const vscode = require('vscode');
-const { TextEncoder } = require('util'); // Node.js util for TextEncoder
-
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const vscode = require("vscode");
+const { TextEncoder } = require("util"); // Node.js util for TextEncoder
 
 /**
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-  // Use the console to output diagnostic information (console.log) and errors (console.error)
-  // This line of code will only be executed once when your extension is activated
   console.log('Congratulations, your extension "my-ai-agent" is now active!');
 
-  // Create a new instance of our ChatViewProvider
   const provider = new ChatViewProvider(context.extensionUri);
 
-  // Register the provider for the sidebar view defined in package.json
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChatViewProvider.viewType, provider)
+    vscode.window.registerWebviewViewProvider(
+      ChatViewProvider.viewType,
+      provider
+    )
   );
 }
 
@@ -338,7 +21,7 @@ function activate(context) {
  * Manages the chat view in the sidebar.
  */
 class ChatViewProvider {
-  static viewType = 'my-ai-agent.chatView';
+  static viewType = "my-ai-agent.chatView";
 
   _view;
   _extensionUri;
@@ -358,38 +41,85 @@ class ChatViewProvider {
   resolveWebviewView(webviewView, context, _token) {
     this._view = webviewView;
 
-    // Configure the webview
     webviewView.webview.options = {
-      // Enable scripts in the webview
       enableScripts: true,
-      // Restrict the webview to only loading content from our extension's directory
-      localResourceRoots: [this._extensionUri]
+      localResourceRoots: [this._extensionUri],
     };
 
-    // Set the HTML content for the webview
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-    // Handle messages from the webview (our HTML/JS)
-    webviewView.webview.onDidReceiveMessage(message => {
+    // Listen for messages from the webview
+    webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.type) {
         // Case: The webview's JS told us the user sent a prompt
-        case 'userPrompt':
+        case "userPrompt":
           const userPrompt = message.text;
 
-          // --- This is where you would call the Gemini API ---
-          // For now, we'll just echo the response as requested.
-          const agentResponse = `Your prompt is "${userPrompt}"`;
+          // --- MODIFICATION START ---
+          // Instead of echoing, let's call our backend server
+          try {
+            const agentResponse = await this.callAgentServer(userPrompt);
 
-          // Send the response back to the webview
-          this._view?.webview.postMessage({ type: 'agentResponse', text: agentResponse });
+            // Send the server's response back to the webview
+            this._view?.webview.postMessage({
+              type: "agentResponse",
+              text: agentResponse,
+            });
+          } catch (error) {
+            console.error("Error calling agent server:", error);
+            const errorMessage = `Error connecting to agent: ${error.message}. Is your Python server running?`;
+            this._view?.webview.postMessage({
+              type: "agentResponse",
+              text: errorMessage,
+            });
+          }
+          // --- MODIFICATION END ---
           break;
 
         // Case: The webview told us it has finished loading
-        case 'agentReady':
-          this._view?.webview.postMessage({ type: 'agentResponse', text: 'Hello! I am your AI Agent. How can I help you today?' });
+        case "agentReady":
+          this._view?.webview.postMessage({
+            type: "agentResponse",
+            text: "Hello! I am your AI Agent, connected to a local server. How can I help?",
+          });
           break;
       }
     });
+  }
+
+  /**
+   * New function to call the local Python server.
+   * @param {string} prompt
+   */
+  async callAgentServer(prompt) {
+    // URL of your local server
+    const url = "http://localhost:8080/chat";
+
+    try {
+      // Use fetch (available in Node.js 18+, which VS Code uses)
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt: prompt,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // We expect the server to return a JSON like {"response": "..."}
+      return data.response || "Server returned an unexpected format.";
+    } catch (error) {
+      console.error("Fetch error:", error);
+      // Re-throw to be caught by the message handler
+      throw new Error(error.message);
+    }
   }
 
   /**
@@ -397,173 +127,463 @@ class ChatViewProvider {
    * @param {vscode.Webview} webview
    */
   _getHtmlForWebview(webview) {
-    // Note: We're inlining all HTML, CSS, and JS for simplicity.
-    // In a larger extension, you would load these from separate files.
+    // --- THIS HTML IS UNCHANGED FROM THE PREVIOUS VERSION ---
+    // (It already knows how to send 'userPrompt' and receive 'agentResponse')
+    return `
+	<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Agent Chat - Crypto Theme</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    return `<!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>AI Agent Chat</title>
-          <style>
-            /* Use VS Code CSS variables for a native look */
-            body, html {
-              margin: 0;
-              padding: 0;
-              height: 100%;
-              color: var(--vscode-foreground);
-              background-color: var(--vscode-sideBar-background, var(--vscode-editor-background));
-              font-family: var(--vscode-font-family);
+        body, html {
+            height: 100%;
+            width: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1428 100%);
+            color: #e0e0ff;
+            overflow: hidden;
+        }
+
+        #chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 50%, #0f1428 100%);
+            position: relative;
+        }
+
+        /* Animated background gradient */
+        #chat-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 20% 50%, rgba(0, 255, 200, 0.05) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 80%, rgba(138, 43, 226, 0.05) 0%, transparent 50%);
+            pointer-events: none;
+            animation: gradientShift 15s ease-in-out infinite;
+        }
+
+        @keyframes gradientShift {
+            0%, 100% {
+                opacity: 0.5;
             }
-            #chat-container {
-              display: flex;
-              flex-direction: column;
-              height: 100vh;
-              padding: 8px;
-              box-sizing: border-box; /* Include padding in height */
+            50% {
+                opacity: 1;
             }
-            #messages {
-              flex-grow: 1;
-              overflow-y: auto;
-              padding-bottom: 8px; /* Space above input */
+        }
+
+        /* Header */
+        #header {
+            padding: 20px;
+            background: linear-gradient(90deg, rgba(0, 255, 200, 0.1) 0%, rgba(138, 43, 226, 0.1) 100%);
+            border-bottom: 2px solid rgba(0, 255, 200, 0.3);
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 4px 20px rgba(0, 255, 200, 0.1);
+        }
+
+        #header h1 {
+            font-size: 24px;
+            background: linear-gradient(90deg, #00ffc8 0%, #8a2be2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-shadow: 0 0 20px rgba(0, 255, 200, 0.3);
+        }
+
+        #messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Scrollbar styling */
+        #messages::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #messages::-webkit-scrollbar-track {
+            background: rgba(0, 255, 200, 0.05);
+            border-radius: 10px;
+        }
+
+        #messages::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #00ffc8 0%, #8a2be2 100%);
+            border-radius: 10px;
+        }
+
+        #messages::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #00ffdd 0%, #a855f7 100%);
+        }
+
+        .message {
+            display: flex;
+            animation: slideIn 0.5s ease-out;
+            max-width: 70%;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
             }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Agent message - left aligned */
+        .agent-message {
+            align-self: flex-start;
+            animation: slideInLeft 0.5s ease-out;
+        }
+
+        @keyframes slideInLeft {
+            from {
+                opacity: 0;
+                transform: translateX(-30px) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0) translateY(0);
+            }
+        }
+
+        .agent-message .message-content {
+            background: linear-gradient(135deg, rgba(0, 255, 200, 0.15) 0%, rgba(0, 200, 150, 0.1) 100%);
+            border: 1px solid rgba(0, 255, 200, 0.4);
+            border-left: 3px solid #00ffc8;
+            box-shadow: 0 8px 32px rgba(0, 255, 200, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .agent-message .message-sender {
+            color: #00ffc8;
+            text-shadow: 0 0 10px rgba(0, 255, 200, 0.5);
+        }
+
+        /* User message - right aligned */
+        .user-message {
+            align-self: flex-end;
+            animation: slideInRight 0.5s ease-out;
+        }
+
+        @keyframes slideInRight {
+            from {
+                opacity: 0;
+                transform: translateX(30px) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0) translateY(0);
+            }
+        }
+
+        .user-message .message-content {
+            background: linear-gradient(135deg, rgba(138, 43, 226, 0.2) 0%, rgba(100, 50, 200, 0.15) 100%);
+            border: 1px solid rgba(138, 43, 226, 0.5);
+            border-right: 3px solid #a855f7;
+            box-shadow: 0 8px 32px rgba(138, 43, 226, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .user-message .message-sender {
+            color: #a855f7;
+            text-shadow: 0 0 10px rgba(168, 85, 247, 0.5);
+        }
+
+        .message-content {
+            padding: 12px 16px;
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .message-content:hover {
+            box-shadow: 0 12px 40px rgba(0, 255, 200, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .message-sender {
+            font-weight: 700;
+            font-size: 12px;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .message-text {
+            font-size: 14px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            color: #e0e0ff;
+        }
+
+        /* Input area */
+        #input-area {
+            display: flex;
+            gap: 12px;
+            padding: 20px;
+            background: linear-gradient(90deg, rgba(0, 255, 200, 0.05) 0%, rgba(138, 43, 226, 0.05) 100%);
+            border-top: 2px solid rgba(0, 255, 200, 0.2);
+            position: relative;
+            z-index: 1;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        #prompt-input {
+            flex-grow: 1;
+            padding: 12px 16px;
+            border: 2px solid rgba(0, 255, 200, 0.3);
+            background: rgba(15, 20, 40, 0.8);
+            color: #e0e0ff;
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 14px;
+            resize: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            max-height: 100px;
+        }
+
+        #prompt-input:focus {
+            outline: none;
+            border-color: #00ffc8;
+            box-shadow: 0 0 20px rgba(0, 255, 200, 0.4), inset 0 0 10px rgba(0, 255, 200, 0.1);
+            background: rgba(15, 20, 40, 0.95);
+        }
+
+        #prompt-input::placeholder {
+            color: rgba(224, 224, 255, 0.4);
+        }
+
+        #send-button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #00ffc8 0%, #00d9b3 100%);
+            color: #0a0e27;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(0, 255, 200, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        #send-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        #send-button:hover {
+            background: linear-gradient(135deg, #00ffdd 0%, #00e6c3 100%);
+            box-shadow: 0 6px 25px rgba(0, 255, 200, 0.5);
+            transform: translateY(-2px);
+        }
+
+        #send-button:hover::before {
+            left: 100%;
+        }
+
+        #send-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(0, 255, 200, 0.3);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
             .message {
-              padding: 8px;
-              margin-bottom: 8px;
-              border-radius: 4px;
-              white-space: pre-wrap; /* Respect newlines */
+                max-width: 85%;
             }
-            .user-message {
-              background-color: var(--vscode-input-background);
+
+            #header h1 {
+                font-size: 18px;
             }
-            .agent-message {
-              background-color: var(--vscode-list-hoverBackground);
+
+            #messages {
+                padding: 12px;
+                gap: 8px;
             }
-            .message-sender {
-              font-weight: bold;
-              font-size: 0.9em;
-              margin-bottom: 4px;
-            }
+
             #input-area {
-              display: flex;
-              border-top: 1px solid var(--vscode-input-border, var(--vscode-sideBar-border));
-              padding-top: 8px;
+                padding: 12px;
+                gap: 8px;
             }
+
             #prompt-input {
-              flex-grow: 1;
-              width: 100%;
-              border: 1px solid var(--vscode-input-border);
-              background-color: var(--vscode-input-background);
-              color: var(--vscode-input-foreground);
-              border-radius: 4px;
-              padding: 6px;
-              resize: none; /* Don't allow manual resize */
+                font-size: 13px;
+                padding: 10px 12px;
             }
+
             #send-button {
-              margin-left: 8px;
-              background-color: var(--vscode-button-background);
-              color: var(--vscode-button-foreground);
-              border: none;
-              border-radius: 4px;
-              padding: 6px 12px;
-              cursor: pointer;
+                padding: 10px 16px;
+                font-size: 12px;
             }
-            #send-button:hover {
-              background-color: var(--vscode-button-hoverBackground);
-            }
-          </style>
-      </head>
-      <body>
-          <div id="chat-container">
-            <div id="messages">
-              <!-- Messages will be added here by JS -->
-            </div>
-            <div id="input-area">
-              <textarea id="prompt-input" rows="3" placeholder="Type your message..."></textarea>
-              <button id="send-button">Send</button>
-            </div>
-          </div>
+        }
 
-          <script>
-            // Standard VS Code webview script boilerplate
-            const vscode = acquireVsCodeApi();
-
-            const messagesDiv = document.getElementById('messages');
-            const input = document.getElementById('prompt-input');
-            const sendButton = document.getElementById('send-button');
-
-            /**
-             * Appends a message to the chat display.
-             */
-            function addMessage(sender, text, type) {
-              const messageDiv = document.createElement('div');
-              messageDiv.className = 'message ' + type;
-              
-              const senderDiv = document.createElement('div');
-              senderDiv.className = 'message-sender';
-              senderDiv.textContent = sender;
-              
-              const textDiv = document.createElement('div');
-              textDiv.textContent = text; // Use textContent to prevent XSS
-              
-              messageDiv.appendChild(senderDiv);
-              messageDiv.appendChild(textDiv);
-              messagesDiv.appendChild(messageDiv);
-              
-              // Scroll to bottom
-              messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        @media (max-width: 480px) {
+            .message {
+                max-width: 95%;
             }
 
-            /**
-             * Handles sending the prompt.
-             */
-            function sendPrompt() {
-              const text = input.value.trim();
-              if (text) {
+            #header h1 {
+                font-size: 16px;
+            }
+
+            #messages {
+                padding: 8px;
+                gap: 6px;
+            }
+
+            #input-area {
+                padding: 8px;
+                gap: 6px;
+                flex-direction: column;
+            }
+
+            #send-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="chat-container">
+        <div id="header">
+            <h1>⚡ AI Agent Chat</h1>
+        </div>
+        <div id="messages">
+            <!-- Messages will be added here by JS -->
+        </div>
+        <div id="input-area">
+            <textarea id="prompt-input" rows="2" placeholder="Type your message..."></textarea>
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script>
+        // Standard VS Code webview script boilerplate
+        const vscode = acquireVsCodeApi();
+
+        const messagesDiv = document.getElementById('messages');
+        const input = document.getElementById('prompt-input');
+        const sendButton = document.getElementById('send-button');
+
+        /**
+         * Appends a message to the chat display with animation.
+         */
+        function addMessage(sender, text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message ' + type;
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'message-content';
+            
+            const senderDiv = document.createElement('div');
+            senderDiv.className = 'message-sender';
+            senderDiv.textContent = sender;
+            
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = text;
+            
+            contentDiv.appendChild(senderDiv);
+            contentDiv.appendChild(textDiv);
+            messageDiv.appendChild(contentDiv);
+            messagesDiv.appendChild(messageDiv);
+            
+            // Scroll to bottom with smooth behavior
+            setTimeout(() => {
+                messagesDiv.scrollTop = messagesDiv.scrollHeight;
+            }, 50);
+        }
+
+        /**
+         * Handles sending the prompt.
+         */
+        function sendPrompt() {
+            const text = input.value.trim();
+            if (text) {
                 // Display the user's message immediately
                 addMessage('You', text, 'user-message');
                 
                 // Send the message to the extension
                 vscode.postMessage({
-                  type: 'userPrompt',
-                  text: text
+                    type: 'userPrompt',
+                    text: text
                 });
                 
                 // Clear the input
                 input.value = '';
-              }
+                input.style.height = 'auto';
             }
+        }
 
-            // --- Event Listeners ---
+        // Auto-resize textarea
+        input.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+        });
 
-            // Send on button click
-            sendButton.addEventListener('click', sendPrompt);
+        // --- Event Listeners ---
 
-            // Send on 'Enter' (but not 'Shift+Enter')
-            input.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault(); // Prevent new line
+        // Send on button click
+        sendButton.addEventListener('click', sendPrompt);
+
+        // Send on 'Enter' (but not 'Shift+Enter')
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 sendPrompt();
-              }
-            });
+            }
+        });
 
-            // Listen for messages from the extension
-            window.addEventListener('message', event => {
-              const message = event.data; // The JSON data sent from extension
-              if (message.type === 'agentResponse') {
+        // Listen for messages from the extension
+        window.addEventListener('message', event => {
+            const message = event.data;
+            if (message.type === 'agentResponse') {
                 addMessage('AI Agent', message.text, 'agent-message');
-              }
-            });
+            }
+        });
 
-            // Tell the extension that the webview is ready
-            window.onload = () => {
-              vscode.postMessage({ type: 'agentReady' });
-            };
+        // Tell the extension that the webview is ready
+        window.onload = () => {
+            vscode.postMessage({ type: 'agentReady' });
+        };
+    </script>
+</body>
+</html>
 
-          </script>
-      </body>
-      </html>`;
+	`;
   }
 }
 
@@ -572,6 +592,5 @@ function deactivate() {}
 
 module.exports = {
   activate,
-  deactivate
-}
-
+  deactivate,
+};
