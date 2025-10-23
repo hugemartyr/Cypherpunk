@@ -1,15 +1,3 @@
-# A simple Flask server to act as your AI agent backend.
-#
-# 1. Install Flask:
-#    pip install Flask flask-cors
-#
-# 2. Run this server:
-#    python python_server.py
-#
-# It will run on http://localhost:8080
-
-from flask import Flask, request, jsonify
-from flask_cors import CORS
 import os, uuid, json, requests, sys, time
 import dotenv
 dotenv.load_dotenv()
@@ -20,54 +8,6 @@ MODEL = "asi1-fast-agentic"
 TIMEOUT = 90
 
 SESSION_MAP: dict[str, str] = {}
-
-app = Flask(__name__)
-# Enable CORS to allow your VS Code extension (which runs on a different origin)
-# to make requests to this server.
-CORS(app)
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    # Get the prompt from the VS Code extension
-    data = request.json
-    prompt = data.get('prompt')
-
-    if not prompt:
-        return jsonify({"error": "No prompt provided"}), 400
-
-    print(f"Received prompt: {prompt}")
-
-            
-    try:
-        while True:
-            user_input = prompt.strip()
-            if not user_input:
-                continue
-                
-            history.append({"role": "user", "content": user_input})
-            reply = ask(conv_id, history, stream=True)
-            
-            
-            history.append({"role": "assistant", "content": reply})
-
-            if "I've sent the message" in reply:
-                follow = poll_for_async_reply(conv_id, history)
-                if follow:
-                    print(f"\n[Agentverse agent reply]\n{follow}")
-                    history.append({"role": "assistant", "content": follow})
-
-                    # Send the response back to the VS Code extension
-                    return jsonify({
-                        "response": follow
-                    })
-                    
-            else:
-                # Send the response back to the VS Code extension
-                return jsonify({
-                    "response": reply
-                })        
-    except KeyboardInterrupt:
-        print("\nBye!")
 
 def get_session_id(conv_id: str) -> str:
     sid = SESSION_MAP.get(conv_id)
@@ -143,7 +83,20 @@ if __name__ == "__main__":
     history: list[dict] = []
 
     print("Agentic LLM demo. Type Ctrl+C to exit.\n")
-    
-     # Run the server on port 8080, accessible from any IP
-    app.run(host='0.0.0.0', port=8080, debug=True)
-    
+    try:
+        while True:
+            user_input = input("you > ").strip()
+            if not user_input:
+                continue
+                
+            history.append({"role": "user", "content": user_input})
+            reply = ask(conv_id, history, stream=True)
+            history.append({"role": "assistant", "content": reply})
+
+            if "I've sent the message" in reply:
+                follow = poll_for_async_reply(conv_id, history)
+                if follow:
+                    print(f"\n[Agentverse agent reply]\n{follow}")
+                    history.append({"role": "assistant", "content": follow})
+    except KeyboardInterrupt:
+        print("\nBye!")
