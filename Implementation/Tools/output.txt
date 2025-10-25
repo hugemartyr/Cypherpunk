@@ -1,0 +1,7 @@
+--- Running Sentiment Task (Small Model) ---
+
+--- RESULT 1 ---
+{
+  "status": "error",
+  "message": "Orchestrator Error: [Errno 2] No such file or directory: '/Users/ajitesh/Desktop/Cypherpunk/.venv/bin/pip3'"
+}
