@@ -205,7 +205,7 @@ class OrchestratorKnowledgeGraph:
         query = f'!(match &self (= (model-for-task "{task}" "{tag}") $model_id) $model_id)'
         result = self.metta.run(query)
         
-        print(f"[DEBUG] find_model_for_task('{task}', '{tag}') result: {result}")
+        # print(f"[DEBUG] find_model_for_task('{task}', '{tag}') result: {result}")
         if result and result[0]:
             # result is like [['"segmind/tiny-sd"']]
             # We take the first result, first element, and convert from Symbol Atom to string
@@ -222,7 +222,7 @@ class OrchestratorKnowledgeGraph:
 
         query = f'!(match &self (= (specialist-agent "{model_id}") $agent_addr) $agent_addr)'
         result = self.metta.run(query)
-        print(f"[DEBUG] find_specialist_agent('{model_id}') result: {result}")
+        # print(f"[DEBUG] find_specialist_agent('{model_id}') result: {result}")
         if result and result[0]:
             return str(result[0][0])
         return None
@@ -243,6 +243,8 @@ class OrchestratorKnowledgeGraph:
         Increments the usage count for a model ID.
         This is a "transaction" (remove old atom, add new one).
         """
+        #remove ""
+        model_id = model_id.replace('"', '')
         # This function will now work because get_usage_count is fixed
         current_count = self.get_usage_count(model_id)
         new_count = current_count + 1
@@ -251,7 +253,7 @@ class OrchestratorKnowledgeGraph:
         old_atom = self.metta.parse_single(f'(= (usage-count "{model_id}") {current_count})')
         new_atom = self.metta.parse_single(f'(= (usage-count "{model_id}") {new_count})')
         
-        print(f"[DEBUG] increment_usage_count('{model_id}'): {current_count} -> {new_count}")
+        # print(f"[DEBUG] increment_usage_count('{model_id}'): {current_count} -> {new_count}")
         
         # 2. Perform the update
         if self.metta.space().remove_atom(old_atom):
@@ -264,6 +266,8 @@ class OrchestratorKnowledgeGraph:
 
     def register_specialist_agent(self, model_id: str, agent_address: str):
         """Adds a new atom to register a deployed specialist agent."""
+        model_id = model_id.replace('"', '')
+        # print(f"[DEBUG] register_specialist_agent({model_id}, '{agent_address}')")
         atom = self.metta.parse_single(f'(= (specialist-agent "{model_id}") "{agent_address}")')
         self.metta.space().add_atom(atom)
         logger.info(f"Registered new specialist for {model_id} at {agent_address}")
@@ -284,12 +288,11 @@ class OrchestratorKnowledgeGraph:
         
     def get_tasks_whom_we_have_knowledge_of(self) -> list[str]:
         """Returns a list of all tasks we have knowledge of."""
-        
-        
+    
         query = '!(match &self (= (model-for-task $task_name "default") $model_id) $task_name)'
         result = self.metta.run(query)
         tasks = [str(row[0]) for row in result if row]
-        print(f"[DEBUG] get_tasks_whom_we_have_knowledge_of() result: {tasks}")
+        # print(f"[DEBUG] get_tasks_whom_we_have_knowledge_of() result: {tasks}")
         return tasks    
 
 

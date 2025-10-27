@@ -3,6 +3,12 @@ import re
 from datetime import datetime, timezone
 from uuid import uuid4
 from uagents import Agent, Context, Model, Protocol
+from uagents.setup import fund_agent_if_low
+from dotenv import load_dotenv
+
+load_dotenv()
+
+from fastapi import FastAPI
 
 # Import the chat protocol specification
 from uagents_core.contrib.protocols.chat import (
@@ -15,13 +21,13 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 # Import our MeTTa Knowledge Graph
-from meTTa.knowledge_graph import OrchestratorKnowledgeGraph 
+from meTTa.knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
 THRESHOLD_TO_DEPLOY_NEW_AGENT = 5
 
 # --- Agent Configuration ---
 
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase"
+AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_1"
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
@@ -56,17 +62,17 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
     Expected format: "generate <task> <prompt>"
     """
     match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
+    
+    ## yaha pe query sahi se parse karna hai.....pass it to llm for better parsing and give all the available tasks and get prompt + task from user query
+    
+    
     if match:
         task = match.group(1).lower()  # e.g., "image-generation"
         prompt = match.group(2)       # e.g., "a red car"
         return task, prompt
     return None, None
 
-async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):
-    """
-    This function contains the complete logic flowchart you described.
-    """
-    
+async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):    
     # 1. Parse the user's intent
     task, prompt = parse_user_query(user_query)
     
@@ -74,7 +80,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         logger.warning(f"Could not parse task from query: {user_query}")
         await ctx.send(sender, create_text_chat(f"Sorry, I don't understand. Please use the format: 'generate <task> <prompt>'"))
         return
-
+    
     ctx.logger.info(f"Parsed query: task='{task}', prompt='{prompt[:20]}...'")
     
     # --- Start Flowchart ---
@@ -119,8 +125,12 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                 # [ACTION] Tell HF_agent (our deploy tool) to deploy this model
                 ctx.logger.info(f"[ACTION] Calling 'provisioner.py' to deploy new agent for '{model_id}'...")
                 
+                
+                # here we will recieve message from HF_agent about new deployed agent address
+                
+                
                 # Simulate a new address and update the knowledge graph
-                new_agent_address = f"agent1q...simulated-addr-for-{model_id.split('/')[0]}"
+                new_agent_address = f"agent1q...simulated-addr-for-new-agent"
                 kg.register_specialist_agent(model_id, new_agent_address)
                 
                 ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
@@ -134,6 +144,9 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         # [ACTION] Search Hugging Face Hub for the best model for this task
         ctx.logger.info(f"[ACTION] Searching Hugging Face Hub for '{task}'...")
         
+        
+        
+        
         # Simulate finding a new model
         simulated_new_model = f"hf-hub/new-model-for-{task}"
         ctx.logger.info(f"Found new model: {simulated_new_model}")
@@ -146,7 +159,6 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{simulated_new_model}'...")
         response_text = f"Found new model '{simulated_new_model}' on HF Hub. [Simulating call: Running model locally...]"
         await ctx.send(sender, create_text_chat(response_text))
-
 
 # --- Agent Message Handlers ---
 
@@ -190,7 +202,6 @@ agent.include(chat_proto, publish_manifest=True)
 
 
 # --- Main block for Testing (as requested) ---
-
 # We create a "Mock" Context to test the logic without running the agent
 class MockContext:
     def __init__(self, name="mock_agent"):
@@ -241,6 +252,8 @@ async def run_tests():
         print(f"\n  ... usage loop {i+2} ...")
         # In the last loop, it should trigger the deployment
         await main_orchestrator_logic(mock_ctx, mock_sender, query2, test_kg)
+        test_kg.find_specialist_agent("microsoft/Phi-3-mini-4k-instruct")
+        
 
     print("\n--- TEST 5: Check if specialist was registered ---")
     model_id = test_kg.find_model_for_task("text-generation")
@@ -251,15 +264,37 @@ async def run_tests():
     else:
         print("TEST 5 FAILED")
 
+    print_all_atoms (test_kg.metta)
+
     print("\n--- TEST SUITE COMPLETE ---")
+
+fund_agent_if_low(agent.wallet.address())
+
+
+
+# name = "Chat Protocol Adapter"
+# identity = Identity.from_seed(os.environ["AGENT_SEED_PHRASE"], 0)
+# readme = "# Chat Protocol Adapter \nExample of how to integrate chat protocol."
+# endpoint = "AGENT_EXTERNAL_ENDPOINT"
+# app = FastAPI()
+# @app.get("/status")
+# async def healthcheck():
+#     return {"status": "OK - Agent is running"}
+# @app.post("/chat")
+# async def handle_message(env: Envelope):
+#     msg = cast(ChatMessage, parse_envelope(env, ChatMessage))
+#     print(f"Received message from {env.sender}: {msg.text()}")
+#     handle_message(agent.context, env.sender, msg)
 
 if __name__ == "__main__":
     
+    pass
+    
     # To run the test suite (as requested):
-    import asyncio
-    asyncio.run(run_tests())
+    # import asyncio
+    # asyncio.run(run_tests())
     
     # To run the actual agent (uncomment this):
-    # logger.info(f"Starting agent '{agent.name}' on address: {agent.address}")
-    # agent.run()
+    logger.info(f"Starting agent '{agent.name}' on address: {agent.address}")
+    agent.run()
 
