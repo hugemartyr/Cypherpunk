@@ -7,9 +7,9 @@ import sys # Import sys for flushing output
 dotenv.load_dotenv()
 
 # --- ASI1.ai API Configuration ---
-url = "https://api.asi1.ai/v1/chat/completions"
+url = "https://api.asi1.ai/v1"
 api_key = os.environ.get('ASI_ONE_API_KEY') 
-model_name = "asi1-fast-agentic" # The model you are using
+model_name = "asi1-mini" # The model you are using
 
 if not api_key:
     print("FATAL ERROR: ASI_ONE_API_KEY environment variable is not set.")

@@ -18,7 +18,7 @@
 #     name="agent1",
 #     seed=SEED_PHRASE,
 #     port=8000,
-#     endpoint=["http://localhost:8000/submit"]
+#     endpoint=["http://localhost:8001/submit"]
 # )
 
 # # Store agent2's address (you'll need to replace this with actual address)

@@ -12,12 +12,14 @@ from uagents_core.contrib.protocols.chat import (
 
 SEED_PHRASE = "put_your_seed_phrase_here2"
 
+
+
 # Initialise agent2
 agent2 = Agent(
     name="alice",
     seed=SEED_PHRASE,
     port=8001,
-    endpoint=["http://localhost:8001/submit"]
+    endpoint=["http://localhost:8000/submit"]
 )
 
 # Initialize the chat protocol
@@ -61,6 +63,9 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 # Include the protocol in the agent to enable the chat functionality
 # This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
 agent2.include(chat_proto, publish_manifest=True)
+
+
+
 
 if __name__ == '__main__':
     agent2.run()

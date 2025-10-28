@@ -4,14 +4,14 @@ from uagents_adapter import LangchainRegisterTool
 class Message(Model):
     message: str
  
-SEED_PHRASE = "put_your_seed_phrase_here"
+SEED_PHRASE = "put_your_seed_phrase"
  
 # Now your agent is ready to join the Agentverse!
 agent = Agent(
     name="alice",
     port=8000,
     seed=SEED_PHRASE,
-    endpoint=["http://localhost:8000/submit"]
+    endpoint=["http://localhost:8004/submit"]
 )
  
 # Copy the address shown below
