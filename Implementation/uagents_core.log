@@ -1,0 +1,27 @@
+2025-10-28 22:08:49,715 uagents_core.utils.registration INFO registering to Almanac...
+2025-10-28 22:08:49,715 uagents_core.utils.registration INFO Registering with Almanac API
+2025-10-28 22:08:50,233 uagents_core.utils.registration INFO successfully registered to Almanac.
+2025-10-28 22:08:50,233 uagents_core.utils.registration INFO registering to Agentverse...
+2025-10-28 22:08:52,340 uagents_core.utils.registration INFO successfully registered to Agentverse.
+2025-10-28 22:08:52,340 uagents_core.utils.registration INFO setting agent as active...
+2025-10-28 22:08:52,625 uagents_core.utils.registration INFO successfully set agent to active.
+2025-10-28 22:16:29,304 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:16:29,929 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:16:33,437 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:16:34,206 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:20:31,622 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:20:32,413 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:20:44,750 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:20:45,077 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:20:53,603 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:20:54,017 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:22:47,161 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:22:47,482 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:23:08,313 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:23:08,627 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:23:33,192 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:23:33,506 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:23:36,104 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:23:36,462 uagents_core.utils.messages ERROR Failed to send message to agent
+2025-10-28 22:28:53,547 uagents_core.utils.resolver INFO Got response looking up agent endpoint
+2025-10-28 22:28:53,845 uagents_core.utils.messages ERROR Failed to send message to agent

@@ -2,5 +2,9 @@
     "hf_client": {
         "identity_key": "83e239f1613463e7e6b7968a904f944fa20ea7b64b4ef64e7a8db9fb1324a5fb",
         "wallet_key": "jnC6nt9xYtNFvV8ek8blAVvmfOxKOT73PnxpO1LV8ZM="
+    },
+    "HF Orchestrator Agent": {
+        "identity_key": "30eeeda7cdbdb21a3767383120957ee14a2a8c4478af7a662b8f9cc0be74271f",
+        "wallet_key": "FTxWYMsANuy7OFobhY0Yx6JD4VweWUeSLuiaNJUV+bY="
     }
 }

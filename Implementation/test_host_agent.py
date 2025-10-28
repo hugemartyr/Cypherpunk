@@ -16,8 +16,19 @@ app = FastAPI()
 @app.get("/status")
 async def healthcheck():
     return {"status": "OK - Agent is running"}
-@app.post("/chat")
+# @app.post("/chat")
+# async def handle_message(env: Envelope):
+#     print(f"Received a message via /chat endpoint \n{env}")
+#     msg = cast(ChatMessage, parse_envelope(env, ChatMessage))
+#     print(f"Received message from {env.sender}: {msg.text()}")
+#     send_message_to_agent(
+#         destination=env.sender,
+#         msg=ChatMessage([TextContent("Thanks for the message!")]),
+#         sender=identity,
+#     )
+@app.post("/")
 async def handle_message(env: Envelope):
+    print(f"Received a message via / endpoint \n{env}")
     msg = cast(ChatMessage, parse_envelope(env, ChatMessage))
     print(f"Received message from {env.sender}: {msg.text()}")
     send_message_to_agent(
@@ -25,3 +36,7 @@ async def handle_message(env: Envelope):
         msg=ChatMessage([TextContent("Thanks for the message!")]),
         sender=identity,
     )
+    
+    
+    
+# cd /Users/ajitesh/Desktop/Cypherpunk/Implementation && export AGENT_SEED_PHRASE="test_host_agent_seed_phrase_1234" && /Users/ajitesh/Desktop/Cypherpunk/.venv/bin/python -m uvicorn test_host_agent:app --host 0.0.0.0 --port 8000 --reload    

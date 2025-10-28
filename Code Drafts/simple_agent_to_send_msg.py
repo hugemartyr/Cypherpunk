@@ -1,6 +1,7 @@
 from datetime import datetime
 from uuid import uuid4
-from uagents import Agent, Protocol, Context
+from uagents import Agent, Protocol, Context, Model
+from time import sleep
 
 #import the necessary components from the chat protocol
 from uagents_core.contrib.protocols.chat import (
@@ -10,29 +11,34 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
-SEED_PHRASE = "put_your_seed_phrase_here2"
-
-
-
-# Initialise agent2
-agent2 = Agent(
-    name="alice",
-    seed=SEED_PHRASE,
-    port=8001,
-    endpoint=["http://localhost:8000/submit"]
+# Intialise agent1
+agent1 = Agent(
+    name="Agent1",
+    port=5060,
+    endpoint=["http://localhost:5060/submit"],
 )
+
+# Store agent2's address (you'll need to replace this with actual address)
+agent2_address = "agent1qt5n8ma2g8hc5mcj0ne6hlnx8e8k9xnh9mmxa3jfa9kkgcwqpwlwxd2tddu"
 
 # Initialize the chat protocol
 chat_proto = Protocol(spec=chat_protocol_spec)
 
 
-
-
-# Startup Handler - Print agent details
-@agent2.on_event("startup")
+#Startup Handler - Print agent details and send initial message
+@agent1.on_event("startup")
 async def startup_handler(ctx: Context):
     # Print agent details
     ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
+    
+    # Send initial message to agent2
+    initial_message = ChatMessage(
+        timestamp=datetime.utcnow(),
+        msg_id=uuid4(),
+        content=[TextContent(type="text", text="generate text-generation poem about friendship")]
+    )
+    
+    await ctx.send(agent2_address, initial_message)
 
 # Message Handler - Process received messages and send acknowledgements
 @chat_proto.on_message(ChatMessage)
@@ -53,7 +59,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             response = ChatMessage(
                 timestamp=datetime.utcnow(),
                 msg_id=uuid4(),
-                content=[TextContent(type="text", text="Hello from Agent2!")]
+                content=[TextContent(type="text", text="Hello from Agent1!")]
             )
             await ctx.send(sender, response)
 
@@ -62,12 +68,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.info(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
 
+
+
 # Include the protocol in the agent to enable the chat functionality
 # This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
-agent2.include(chat_proto, publish_manifest=True)
-
-
-
+agent1.include(chat_proto, publish_manifest=True)
 
 if __name__ == '__main__':
-    agent2.run()
+    agent1.run()

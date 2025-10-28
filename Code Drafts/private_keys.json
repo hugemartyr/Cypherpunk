@@ -1,0 +1,14 @@
+{
+    "My First Agent": {
+        "identity_key": "fa18e3a183d4c99b9f86de1d5a5abb576e335a969fae7f21a1fe938556f002d9",
+        "wallet_key": "p6Nj+NBBSz26KmX0tjcQT6yr/SL/W4ffsRSM48I5/oM="
+    },
+    "My Second Agent": {
+        "identity_key": "7a3f5bfcd6dafa1f6a4032d98c3f36f5725fc924fe2a30a5f05f486971029254",
+        "wallet_key": "+cljlVjdDj4aruZYSmrGPFtTqhka/R4TK3ypqA9wUDY="
+    },
+    "Agent1": {
+        "identity_key": "84b0c816191397001148c18326088117a76a8fb1055243aaec61ffa2f5671795",
+        "wallet_key": "qrsS2XMNQkbqKk/IX4L9SjWqNKCmFp37SrmjEvB+qJU="
+    }
+}

@@ -90,7 +90,7 @@ def log(msg):
 def handle_exit(signum, frame):
     global RUNNING
     RUNNING = False
-    log("🛑 Signal received. Shutting down gracefully...")
+    log(" Signal received. Shutting down gracefully...")
 
 signal.signal(signal.SIGINT, handle_exit)
 signal.signal(signal.SIGTERM, handle_exit)
@@ -107,13 +107,13 @@ def infer(pipe, text):
 
 def main():
     global RUNNING
-    log(f"🚀 Persistent Runner started for {{MODEL_ID}}")
+    log(f"Persistent Runner started for {{MODEL_ID}}")
     device = 0 if torch.cuda.is_available() else -1
-    log(f"📦 Loading model on {{'GPU' if device == 0 else 'CPU'}}...")
+    log(f"Loading model on {{'GPU' if device == 0 else 'CPU'}}...")
 
     try:
         pipe = pipeline(TASK_TYPE if TASK_TYPE != "auto" else None, model=MODEL_ID, device=device, trust_remote_code=True)
-        log("✅ Model loaded successfully.")
+        log("Model loaded successfully.")
     except Exception as e:
         log(f"[FATAL] Model loading failed: {{e}}")
         sys.exit(1)
@@ -122,25 +122,25 @@ def main():
     try:
         log(f"⚡ Running initial prompt: {{INITIAL_PROMPT[:60]}}...")
         output = infer(pipe, INITIAL_PROMPT)
-        log(f"🧠 Initial Output: {{output[:120]}}...")
+        log(f"Initial Output: {{output[:120]}}...")
     except Exception as e:
         log(f"[ERROR] During initial inference: {{e}}")
 
-    log("💤 Waiting for new prompts (via stdin)...")
+    log("Waiting for new prompts (via stdin)...")
 
     while RUNNING:
         try:
             if sys.stdin in select.select([sys.stdin], [], [], 1)[0]:
                 new_prompt = sys.stdin.readline().strip()
                 if new_prompt:
-                    log(f"📝 New prompt received: {{new_prompt[:60]}}...")
+                    log(f"New prompt received: {{new_prompt[:60]}}...")
                     resp = infer(pipe, new_prompt)
-                    log(f"💬 Response: {{resp[:150]}}...")
+                    log(f"Response: {{resp[:150]}}...")
             time.sleep(0.5)
         except Exception as e:
             log(f"[ERROR] Runtime: {{e}}")
             time.sleep(1)
-    log("👋 Persistent runner terminated.")
+    log("Persistent runner terminated.")
 
 if __name__ == "__main__":
     main()

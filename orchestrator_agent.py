@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -22,33 +21,27 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 # Import our MeTTa Knowledge Graph
-from meTTa.knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
+from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
 THRESHOLD_TO_DEPLOY_NEW_AGENT = 5
 
 # --- Agent Configuration ---
 
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_2"
+AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_1"
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Initialize Agent and Knowledge Graph
-agent = Agent(
-    name="hf_orchestrator_agent", 
-    seed=AGENT_SEED,
-    port=8000,
-    endpoint=["http://localhost:8000/submit"],
-    mailbox=True,
-    )
-
+agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED)
 kg = OrchestratorKnowledgeGraph()
 
 # --- Chat Protocol Setup (from your example) ---
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 
+hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
 def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
     """Helper function to create a text chat message."""
     content = [TextContent(type="text", text=text)]
@@ -123,8 +116,9 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
             # [ACTION] Tell HF_agent (our local tool) to build and run the model
             ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{model_id}'...")
-            response_text = f"No specialist found. [Simulating call: Running '{model_id}' locally. Usage count: {new_count}]"
+            response_text = f"Generate a transient response using model '{model_id}' for prompt: '{prompt}' and give me the response."
             await ctx.send(sender, create_text_chat(response_text))
+            
 
             # 5. Check if usage count meets the threshold to deploy
             if new_count >= THRESHOLD_TO_DEPLOY_NEW_AGENT:
@@ -142,7 +136,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                 kg.register_specialist_agent(model_id, new_agent_address)
                 
                 ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
-                response_text_2 = f"Usage threshold reached! [Simulating call: Deployed new specialist agent for {model_id} at {new_agent_address}]"
+                response_text_2 = f"generate a persistant chat model with HF model_id = '{model_id}' and task_type = 'auto' and give me the address of new deployed agent."
                 await ctx.send(sender, create_text_chat(response_text_2))
     
     else:
@@ -174,11 +168,14 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     """Handle incoming chat messages."""
     ctx.storage.set(str(ctx.session), sender)
-    print(f"Received message from {sender}: {msg}")
     await ctx.send(
         sender,
         ChatAcknowledgement(timestamp=datetime.now(timezone.utc), acknowledged_msg_id=msg.msg_id),
     )
+    
+    if(sender == hf_manager_address):
+        ctx.logger.info(f"Received message from HF Manager: {sender}")
+        return
 
     for item in msg.content:
         if isinstance(item, StartSessionContent):
@@ -210,101 +207,9 @@ async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
 agent.include(chat_proto, publish_manifest=True)
 
 
-# --- Main block for Testing (as requested) ---
-# We create a "Mock" Context to test the logic without running the agent
-class MockContext:
-    def __init__(self, name="mock_agent"):
-        self.logger = logging.getLogger(name)
-        self.storage = {}
-        self.session = uuid4()
-    
-    async def send(self, sender, msg):
-        print(f"\n[MOCK SEND to {sender}]:")
-        if isinstance(msg, ChatMessage):
-            for item in msg.content:
-                if isinstance(item, TextContent):
-                    print(f"  - {item.text}")
-        else:
-            print(f"  - {msg}")
-    
-    async def query(self, dest, msg, timeout):
-        pass # Not needed for this test
-
-async def run_tests():
-    """Runs a test suite against the main logic function."""
-    print("--- STARTING ORCHESTATOR LOGIC TEST SUITE ---")
-    
-    # Initialize a fresh KG and Mock Context
-    test_kg = OrchestratorKnowledgeGraph()
-    mock_ctx = MockContext()
-    mock_sender = "local_tester"
-
-    # --- Test 1: Path 1a (Knowledge exists, Specialist agent exists) ---
-    print("\n--- TEST 1: Path 1a (Find existing specialist) ---")
-    query1 = "generate crypto-news get latest on $FETCH"
-    await main_orchestrator_logic(mock_ctx, mock_sender, query1, test_kg)
-
-    # --- Test 2: Path 1b (Knowledge exists, No specialist, No threshold) ---
-    print("\n--- TEST 2: Path 1b (Run locally, no threshold) ---")
-    query2 = "generate text-generation a poem about a robot"
-    await main_orchestrator_logic(mock_ctx, mock_sender, query2, test_kg)
-
-    # --- Test 3: Path 2 (No knowledge, discover new) ---
-    print("\n--- TEST 3: Path 2 (Discover new task 'sound-generation') ---")
-    query3 = "generate sound-generation a cat purring"
-    await main_orchestrator_logic(mock_ctx, mock_sender, query3, test_kg)
-
-    # --- Test 4: Path 1b (Trigger deployment threshold) ---
-    print(f"\n--- TEST 4: Triggering deployment for 'text-generation' (Threshold={THRESHOLD_TO_DEPLOY_NEW_AGENT}) ---")
-    # We already ran it once. Let's run it (THRESHOLD - 1) more times.
-    for i in range(THRESHOLD_TO_DEPLOY_NEW_AGENT - 1):
-        print(f"\n  ... usage loop {i+2} ...")
-        # In the last loop, it should trigger the deployment
-        await main_orchestrator_logic(mock_ctx, mock_sender, query2, test_kg)
-        test_kg.find_specialist_agent("microsoft/Phi-3-mini-4k-instruct")
-        
-
-    print("\n--- TEST 5: Check if specialist was registered ---")
-    model_id = test_kg.find_model_for_task("text-generation")
-    agent_addr = test_kg.find_specialist_agent(model_id)
-    print(f"MeTTa now lists specialist for 'text-generation': {agent_addr}")
-    if agent_addr:
-        print("TEST 5 PASSED")
-    else:
-        print("TEST 5 FAILED")
-
-    print_all_atoms (test_kg.metta)
-
-    print("\n--- TEST SUITE COMPLETE ---")
-
 fund_agent_if_low(agent.wallet.address())
 
-# from typing import cast
-# from fastapi import FastAPI
-# import os
-# from uagents_core.envelope import Envelope
-# from uagents_core.identity import Identity
-# from uagents_core.utils.messages import parse_envelope, send_message_to_agent
-# name = "Orchestrator Agent Protocol Adapter"
-# identity = Identity.from_seed(os.environ["AGENT_SEED_PHRASE"], 0)
-# readme = "# Orchestrator Agent Protocol Adapter \nExample of how to integrate orchestrator agent protocol."
-# endpoint = "AGENT_EXTERNAL_ENDPOINT"
-# app = FastAPI()
 
-# @app.post("/")
-# async def handle_message_1(env: Envelope):
-#     print(f"Received a message via / endpoint \n{env}")
-#     msg = cast(ChatMessage, parse_envelope(env, ChatMessage))
-#     print(f"\n\n\nReceived message from {env.sender}: {msg.text()}")
-#     # handle_message(agent.context, env.sender, msg)  
-#     send_message_to_agent(
-#         destination=env.sender,
-#         msg=ChatMessage([TextContent("Thanks for the message!")]),
-#         sender=identity,
-#     )
-#     return {"status": "Message processed"}
-    
-    
 
 # name = "Chat Protocol Adapter"
 # identity = Identity.from_seed(os.environ["AGENT_SEED_PHRASE"], 0)
@@ -321,13 +226,7 @@ fund_agent_if_low(agent.wallet.address())
 #     handle_message(agent.context, env.sender, msg)
 
 if __name__ == "__main__":
-    
     pass
-    
-    # To run the test suite (as requested):
-    # import asyncio
-    # asyncio.run(run_tests())
-    
     # To run the actual agent (uncomment this):
     logger.info(f"Starting agent '{agent.name}' on address: {agent.address}")
     agent.run()

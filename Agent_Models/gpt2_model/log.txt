@@ -1,0 +1,27 @@
+[2025-10-29 03:29:46] Specialist Agent starting for gpt2
+[2025-10-29 03:29:46] Using model cache at: /Users/ajitesh/Desktop/Cypherpunk/Model
+[2025-10-29 03:30:22] Specialist Agent starting for gpt2
+[2025-10-29 03:30:22] Using model cache at: /Users/ajitesh/Desktop/Cypherpunk/Model
+[2025-10-29 03:32:21] New prompt received: generate text-generation poem about friendship...
+[2025-10-29 03:32:21] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:32:22] New prompt received: Hello from Agent1!...
+[2025-10-29 03:32:22] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:32:23] New prompt received: Hello from Agent1!...
+[2025-10-29 03:32:23] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:32:25] New prompt received: Hello from Agent1!...
+[2025-10-29 03:32:25] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:32:26] New prompt received: Hello from Agent1!...
+[2025-10-29 03:32:26] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:33:40] New prompt received: tell me about friendship...
+[2025-10-29 03:33:40] [ERROR] Runtime: The following `model_kwargs` are not used by the model: ['cache_dir'] (note: typos in the generate arguments will also show up in this list)
+[2025-10-29 03:37:57] Specialist Agent starting for gpt2
+[2025-10-29 03:37:57] Using model cache at: /Users/ajitesh/Desktop/Cypherpunk/Model
+[2025-10-29 03:38:17] New prompt received: tell me about friendship...
+[2025-10-29 03:38:19] Response:  and love.
+
+I would like to see you,
+
+I have no intention of leaving the country.
+
+I left my family in the middle of the night when I felt like leavin...
+[2025-10-29 04:39:01] Specialist Agent starting for gpt2

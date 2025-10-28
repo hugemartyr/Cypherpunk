@@ -95,7 +95,7 @@ from uagents_ai_engine.enums import LLM as LLM_ENUM
 
 # --- CONFIGURATION ---
 SEED_PHRASE = "your_unique_secret_seed_for_llm_agent1"
-AGENT_2_ADDRESS = "agent1qvl40hq062ahjpwq48paw06r2tta60m799q9qu0pm9qldgd68hcn6se6wwl"
+AGENT_2_ADDRESS = "agent1qgl8etxfyrhrdqasrukt6xm23gs9lde2dsdy5zrft59tphf4592m5p082ut"
 # Using a free model on Hugging Face (e.g., Mistral)
 HF_MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
 
