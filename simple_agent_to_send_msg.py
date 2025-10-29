@@ -21,7 +21,8 @@ agent1 = Agent(
 # Store agent2's address (you'll need to replace this with actual address)
 # agent2_address = "agent1qt5n8ma2g8hc5mcj0ne6hlnx8e8k9xnh9mmxa3jfa9kkgcwqpwlwxd2tddu"
 # agent2_address = "agent1q0g5qx5cx0jzqvjjn3lpsdzcyvp8m2smkekh8stqeke5uax770k8cdtngc9"
-agent2_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
+# agent2_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
+agent2_address = "agent1qgl8etxfyrhrdqasrukt6xm23gs9lde2dsdy5zrft59tphf4592m5p082ut"
 
 
 
@@ -39,7 +40,7 @@ async def startup_handler(ctx: Context):
     initial_message = ChatMessage(
         timestamp=datetime.utcnow(),
         msg_id=uuid4(),
-        content=[TextContent(type="text", text="i want to have persistant chat, make me model with HF model_id = 'gpt2' and task_type = 'auto' and talk me about AI research papers from the new model. ")],
+        content=[TextContent(type="text", text="sumarize the history of artificial intelligence in brief using the best hugging face models, use necessary tools and follow main_orchestrator logic")],
     )
     
     await ctx.send(agent2_address, initial_message)

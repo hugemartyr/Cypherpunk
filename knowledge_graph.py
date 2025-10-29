@@ -188,7 +188,18 @@ class OrchestratorKnowledgeGraph:
         result = self.metta.run(query)
         tasks = [str(row[0]) for row in result if row]
         # print(f"[DEBUG] get_tasks_whom_we_have_knowledge_of() result: {tasks}")
-        return tasks    
+        return tasks  
+    
+    def get_all_specialist_agents(self):
+        """Returns a list of all registered specialist agents."""
+    
+        # query = '!(match &self (= (specialist-agent $model_id) $agent_addr) $model_id $agent_addr)'
+        # result = self.metta.run(query)
+        # print(f"[DEBUG] get_all_specialist_agents() raw result: {result}")
+        # agents = [(str(row[0]), str(row[1])) for row in result if row]
+        # # print(f"[DEBUG] get_all_specialist_agents() result: {agents}")
+        # return agents
+        return []
 
 
 # --- Main block for Debugging and Testing ---
