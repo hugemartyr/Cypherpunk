@@ -40,7 +40,7 @@ async def startup_handler(ctx: Context):
     initial_message = ChatMessage(
         timestamp=datetime.utcnow(),
         msg_id=uuid4(),
-        content=[TextContent(type="text", text="sumarize the history of artificial intelligence in brief using the best hugging face models, use necessary tools and follow main_orchestrator logic")],
+        content=[TextContent(type="text", text="generate text-summarization history of artificial intelligence in brief using the best hugging face models, use necessary tools and follow main_orchestrator logic")],
     )
     
     await ctx.send(agent2_address, initial_message)

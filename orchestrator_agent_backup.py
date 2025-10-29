@@ -9,7 +9,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI, requests
+from fastapi import FastAPI
+import requests
 
 # Import the chat protocol specification
 from uagents_core.contrib.protocols.chat import (
@@ -24,7 +25,7 @@ from uagents_core.contrib.protocols.chat import (
 # Import our MeTTa Knowledge Graph
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 5
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 3
 
 # --- Agent Configuration ---
 
@@ -39,7 +40,7 @@ logger = logging.getLogger("OrchestratorAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Initialize Agent and Knowledge Graph
-agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED)
+agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED,port=8001)
 kg = OrchestratorKnowledgeGraph()
 
 # --- Chat Protocol Setup (from your example) ---
@@ -60,37 +61,45 @@ def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
 
 # --- Agent's Core Logic ---
 def parse_user_query(user_query: str) -> (str | None, str | None):
-    """
-    Parses the user's free-text query to extract the task and prompt.
+    # """
+    # Parses the user's free-text query to extract the task and prompt.
     
-    pass query to llm to parse it better
-    """
+    # pass query to llm to parse it better
+    # """
     
-    match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
+    # match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
     
-    messages=[
-        {"role": "system", "content": "You are an expert at parsing user queries into structured tasks and prompts."},
-        {"role": "user", "content": f"Parse the following user query into a task and prompt: '{user_query}'.\n"
-                                    "Return only the task and prompt in the format: task:<task_name>; prompt:<prompt_text>."}
-    ]
-    task_prompt_response = requests.post(
-        BASE_URL,
-        headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-        json={
-            "model": MODEL,
-            "messages": messages
-        }
-    )
+    # messages=[
+    #     {"role": "system", "content": "You are an expert at parsing user queries into structured tasks and prompts."},
+    #     {"role": "user", "content": f"Parse the following user query into a task and prompt: '{user_query}'.\n"
+    #                                 "Return only the task and prompt in the format: task:<task_name>; prompt:<prompt_text>."}
+    # ]
+    # task_prompt_response = requests.post(
+    #     BASE_URL,
+    #     headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
+    #     json={
+    #         "model": MODEL,
+    #         "messages": messages
+    #     }
+    # )
 
-    if task_prompt_response.status_code == 200:
-        response_data = task_prompt_response.json()
-        # Extract task and prompt from the response
-        task = response_data.get("task")
-        prompt = response_data.get("prompt")
+    # if task_prompt_response.status_code == 200:
+    #     response_data = task_prompt_response.json()
+    #     # Extract task and prompt from the response
+    #     task = response_data.get("task")
+    #     prompt = response_data.get("prompt")
+    #     return task, prompt
+    # else:
+    #     logger.error(f"Failed to parse user query: {task_prompt_response.text}")
+    #     return None, None
+    
+    # generate using regex for now
+    match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
+    if match:
+        task = match.group(1).strip()
+        prompt = match.group(2).strip()
         return task, prompt
-    else:
-        logger.error(f"Failed to parse user query: {task_prompt_response.text}")
-        return None, None
+    return None, None
 
 
 
@@ -141,7 +150,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             # [ACTION] Tell HF_agent (our local tool) to build and run the model
             ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{model_id}'...")
             response_text = f"Generate a transient response using model '{model_id}' for prompt: '{prompt}' and give me the response."
-            await ctx.send(sender, create_text_chat(response_text))
+            await ctx.send(hf_manager_address, create_text_chat(response_text))
             
 
             # 5. Check if usage count meets the threshold to deploy
@@ -161,7 +170,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                 
                 ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
                 response_text_2 = f"generate a persistant chat model with HF model_id = '{model_id}' and task_type = 'auto' and give me the address of new deployed agent."
-                await ctx.send(sender, create_text_chat(response_text_2))
+                await ctx.send(hf_manager_address, create_text_chat(response_text_2))
     
     else:
         # --- PATH 2: No, I don't have knowledge ---

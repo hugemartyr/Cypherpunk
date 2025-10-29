@@ -2,42 +2,15 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-from uuid import uuid4
-from uagents import Agent, Context, Model, Protocol
-from uagents.setup import fund_agent_if_low
+from uuid import uuid4, UUID
+import json
+from typing import Dict, Any, List
+
+import requests
 from dotenv import load_dotenv
 
-load_dotenv()
-
-# We need requests for the parse_user_query, but let's stub it for now
-# import requests
-# Since requests is used in a non-async function, it's fine.
-# Let's assume the user has 'requests' installed.
-try:
-    import requests
-except ImportError:
-    print("Please install 'requests' library: pip install requests")
-    # Mocking for environments where requests isn't installed
-    class MockResponse:
-        def __init__(self, json_data, status_code):
-            self.json_data = json_data
-            self.status_code = status_code
-        def json(self):
-            return self.json_data
-        @property
-        def text(self):
-            return str(self.json_data)
-
-    class MockRequests:
-        def post(self, *args, **kwargs):
-            print("--- MOCKING 'requests.post' ---")
-            # Mock a successful parse
-            user_query = kwargs.get("json", {}).get("messages", [{}])[-1].get("content", "")
-            if "about robots" in user_query:
-                return MockResponse({"task": "text-generation", "prompt": "about robots"}, 200)
-            return MockResponse({"task": None, "prompt": None}, 400)
-    requests = MockRequests()
-
+from uagents import Agent, Context, Model, Protocol
+from uagents.setup import fund_agent_if_low
 
 # Import the chat protocol specification
 from uagents_core.contrib.protocols.chat import (
@@ -48,38 +21,54 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
-from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 5
+# Import our MeTTa Knowledge Graph
+# Assuming knowledge_graph.py is in Implementation/meTTa/
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 3
 
-# --- Agent Configuration ---
+from Implementation.meTTa.knowledge_graph import OrchestratorKnowledgeGraph, 
+    
 
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_1"
+
+# --- Configuration ---
+load_dotenv()
+
+# Agent Configuration
+AGENT_SEED = os.getenv("ORCHESTRATOR_SEED", "hf_orchestrator_agent_secret_seed_phrase_1")
+AGENT_PORT = int(os.getenv("ORCHESTRATOR_PORT", "8002")) # Use a different port
+
+# ASI:One API Configuration (Optional, for LLM parsing)
 API_KEY = os.getenv("ASI_ONE_API_KEY")
 BASE_URL = "https://api.asi1.ai/v1/chat/completions"
-MODEL = "asi1-mini"
+MODEL_NAME = os.getenv("ASI_ONE_MODEL", "asi1-mini") # Use MODEL_NAME consistently
 
+if not API_KEY:
+    logging.warning("WARNING: ASI_ONE_API_KEY environment variable is not set. LLM parsing will be disabled.")
+    # Agent can still function with regex fallback
+
+# HF Manager Agent Address (Get this from running hf_manager_agent.py)
+HF_MANAGER_ADDRESS = os.getenv("HF_MANAGER_ADDRESS", "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3") # Default for testing
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Initialize Agent and Knowledge Graph
-agent = Agent(name="hf_orchestrator_agent", 
-              seed=AGENT_SEED,
-              port=8001,
-              endpoint=[f"http://localhost:8001/submit"])
+agent = Agent(
+    name="hf_orchestrator_agent",
+    seed=AGENT_SEED,
+    port=AGENT_PORT,
+    endpoint=[f"http://localhost:{AGENT_PORT}/submit"] # Assuming local for now
+)
 kg = OrchestratorKnowledgeGraph()
+
 
 # --- Chat Protocol Setup ---
 
 chat_proto = Protocol(spec=chat_protocol_spec)
 
-# --- MODIFIED ---: This is your primary "worker" agent
-hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
-
 def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
-    """Helper function to create a text chat message."""
+    """Helper function to create a text chat message for the user."""
     content = [TextContent(type="text", text=text)]
     if end_session:
         content.append(EndSessionContent(type="end-session"))
@@ -90,275 +79,309 @@ def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
     )
 
 # --- Agent's Core Logic ---
+
 def parse_user_query(user_query: str) -> (str | None, str | None):
     """
-    Parses the user's free-text query to extract the task and prompt.
+    Parses the user's free-text query using regex (LLM parsing commented out).
     """
-    
-    # --- MODIFIED ---: This LLM call is good, but let's make the prompt more robust
-    # The original regex was too simple.
-    
-    messages=[
-        {"role": "system", "content": (
-            "You are an expert at parsing user queries. Extract the 'task' and 'prompt'."
-            "Tasks are usually things like 'text-generation', 'summarization', 'image-generation', etc."
-            "The prompt is the specific instruction."
-            "Example: 'generate texts about robots' -> task:text-generation; prompt:texts about robots"
-            "Example: 'summarize this document...' -> task:summarization; prompt:this document..."
-            "Return *only* the task and prompt in the format: task:<task_name>; prompt:<prompt_text>"
-        )},
-        {"role": "user", "content": f"Parse: '{user_query}'"}
-    ]
-    
-    try:
-        task_prompt_response = requests.post(
-            BASE_URL,
-            headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-            json={
-                "model": MODEL,
-                "messages": messages
-            }
-        )
+    logger.info(f"Attempting to parse query: '{user_query}'")
+    task = None
+    prompt = None
 
-        if task_prompt_response.status_code == 200:
-            response_text = task_prompt_response.json().get('choices', [{}])[0].get('message', {}).get('content', '')
-            
-            # --- MODIFIED ---: Parse the LLM's structured output
-            task_match = re.search(r"task:([^\s;]+)", response_text, re.IGNORECASE)
-            prompt_match = re.search(r"prompt:(.+)", response_text, re.IGNORECASE)
-            
-            task = task_match.group(1).strip() if task_match else None
-            prompt = prompt_match.group(1).strip() if prompt_match else None
-            
-            if task and prompt:
-                return task, prompt
-            else:
-                logger.warning(f"Could not parse LLM response: {response_text}")
-                return None, None
-        else:
-            logger.error(f"Failed to parse user query (API Error): {task_prompt_response.text}")
-            return None, None
-    except Exception as e:
-        logger.error(f"Exception in parse_user_query: {e}")
-        return None, None
+    # --- Fallback Regex ---
+    # generate using regex for now
+    match = re.match(r"generate\s+([a-zA-Z0-9/_-]+)\s+(.+)", user_query, re.IGNORECASE) # Allow '/' in model ID task
+    if match:
+        task = match.group(1).lower().strip()
+        prompt = match.group(2).strip()
+        logger.info(f"Regex parsed query: task='{task}', prompt='{prompt[:50]}...'")
+        return task, prompt
+
+    logger.error(f"Could not parse task or prompt from query: {user_query}")
+    return None, None
 
 
-async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):    
+async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):
     # 1. Parse the user's intent
     task, prompt = parse_user_query(user_query)
-    
-    if not task or not prompt:
-        logger.warning(f"Could not parse task/prompt from query: {user_query}")
-        # --- MODIFIED ---: Send error back to the original caller
-        await ctx.send(sender, create_text_chat(f"Sorry, I couldn't understand the task. Please be more specific, e.g., 'generate text about robots'."))
+
+    if not task or not prompt: # Both are needed now
+        logger.warning(f"Could not parse valid task and prompt from query: {user_query}")
+        await ctx.send(sender, create_text_chat(f"Sorry, I couldn't understand the task or prompt. Please use the format: 'generate <task> <prompt>'."))
         return
-    
-    ctx.logger.info(f"Parsed query: task='{task}', prompt='{prompt[:30]}...'")
-    
+
+    ctx.logger.info(f"Processing Request: task='{task}', prompt='{prompt[:50]}...'")
+    request_id = str(uuid4()) # Unique ID for this specific interaction
+
     # --- Start Flowchart ---
-    
-    # 2. Check MeTTa for knowledge of this task
     ctx.logger.info(f"Checking MeTTa for task: '{task}'")
     model_id = kg.find_model_for_task(task)
-    
+
     if model_id:
         # --- PATH 1: Yes, I have knowledge ---
         ctx.logger.info(f"Knowledge found. Preferred Model ID: {model_id}")
-        
-        # 3. Check if a specialist agent exists for this model
+        # Store sender and model_id for this request
+        ctx.storage.set(request_id, json.dumps({"sender": sender, "model_id": model_id}))
+
         specialist_agent = kg.find_specialist_agent(model_id)
-        
+
         if specialist_agent:
             # --- PATH 1a: Yes, agent exists ---
             ctx.logger.info(f"Specialist agent found: {specialist_agent}")
-            
-            # --- MODIFIED ---: [ACTION] Pass prompt to that agent
-            ctx.logger.info(f"[ACTION] Forwarding query to specialist agent: {specialist_agent}")
-            # We can just forward the original user query
-            await ctx.send(specialist_agent, create_text_chat(user_query))
-            
-            # --- MODIFIED ---: Notify the original caller
-            await ctx.send(sender, create_text_chat(f"Found a specialist agent for this task. Forwarding your request..."))
+            ctx.logger.info(f"[ACTION] Forwarding prompt to specialist agent: {specialist_agent} (Request ID: {request_id})")
+
+            # Send prompt + request_id to specialist via ChatMessage
+            # Specialist needs to know how to handle this and include request_id in reply
+            message_to_specialist = f"Request ID: {request_id}\nPrompt: {prompt}"
+            await ctx.send(specialist_agent, ChatMessage(
+                content=[TextContent(type="text", text=message_to_specialist)]
+            ))
+            await ctx.send(sender, create_text_chat(f"Found specialist agent for '{model_id}'. Forwarding your request..."))
+            # We now wait for the specialist's reply in the handle_message function
 
         else:
             # --- PATH 1b: No, agent does not exist ---
             ctx.logger.info(f"No specialist agent found for '{model_id}'.")
-            
-            # 4. Increment usage count for this model
             new_count = kg.increment_usage_count(model_id)
             ctx.logger.info(f"Incremented usage count for '{model_id}' to: {new_count}")
 
-            # --- MODIFIED ---: [ACTION] Tell HF_agent to run the model
-            ctx.logger.info(f"[ACTION] Sending request to HF Manager to run '{model_id}'...")
-            # We create a structured request for our HF Manager
-            request_text = f"generate from {model_id} {prompt}"
-            await ctx.send(hf_manager_address, create_text_chat(request_text))
-            
-            # --- MODIFIED ---: Notify the original caller
-            await ctx.send(sender, create_text_chat(f"No specialist found. Requesting generation from a general worker using '{model_id}'..."))
-            
-
-            # 5. Check if usage count meets the threshold to deploy
+            # Decide whether to deploy or just run transiently
             if new_count >= THRESHOLD_TO_DEPLOY_NEW_AGENT:
                 ctx.logger.info(f"Usage threshold ({THRESHOLD_TO_DEPLOY_NEW_AGENT}) reached!")
+                ctx.logger.info(f"[ACTION] Requesting PERSISTENT run from HF Manager for '{model_id}' (Request ID: {request_id})")
+                await ctx.send(sender, create_text_chat(f"Usage high for '{model_id}'. Requesting dedicated agent deployment..."))
                 
-                # --- MODIFIED ---: [ACTION] Tell HF_agent to deploy this model
-                ctx.logger.info(f"[ACTION] Sending deploy request to HF Manager for '{model_id}'...")
-                deploy_request_text = f"deploy persistent model_id={model_id} task={task}"
-                await ctx.send(hf_manager_address, create_text_chat(deploy_request_text))
-                
-                # --- MODIFIED ---: Notify user about the *deployment*, not the result
-                await ctx.send(sender, create_text_chat(f"Note: Usage threshold for '{model_id}' reached. Initiating background deployment of a new specialist agent."))
-                
-                # --- MODIFIED ---: Removed the synchronous simulation block.
-                # The response to this deploy request will be handled asynchronously
-                # by the handle_message function when the HF Manager replies.
-    
+                # Send instruction via ChatMessage
+                instruction = (
+                    f"Request ID: {request_id}\n"
+                    f"Mode: persistent\n"
+                    f"Model ID: {model_id}\n"
+                    f"Task Type: {task}"
+                )
+                await ctx.send(HF_MANAGER_ADDRESS, create_text_chat(instruction))
+
+            else:
+                ctx.logger.info(f"[ACTION] Requesting TRANSIENT run from HF Manager for '{model_id}' (Request ID: {request_id})")
+                await ctx.send(sender, create_text_chat(f"No specialist found. Requesting temporary run for '{model_id}'..."))
+
+                # Send instruction via ChatMessage
+                instruction = (
+                    f"Request ID: {request_id}\n"
+                    f"Mode: transient\n"
+                    f"Model ID: {model_id}\n"
+                    f"Task Type: {task}\n"
+                    f"Prompt: {prompt}"
+                )
+                await ctx.send(HF_MANAGER_ADDRESS, create_text_chat(instruction))
+
     else:
         # --- PATH 2: No, I don't have knowledge ---
         ctx.logger.info(f"No knowledge found for new task: '{task}'")
-        
-        # [ACTION] Search Hugging Face Hub for the best model for this task
-        # --- MODIFIED ---: This should also be a request to the HF Manager
-        ctx.logger.info(f"[ACTION] Asking HF Manager to find a model for '{task}'...")
-        
-        # This message asks the manager to *both* find and run the model
-        request_text = f"find and generate for task={task} {prompt}"
-        await ctx.send(hf_manager_address, create_text_chat(request_text))
-        
-        # --- MODIFIED ---: Notify the original caller
-        await ctx.send(sender, create_text_chat(f"I don't know that task yet. Asking the HF Manager to find a suitable model on the Hub..."))
+        ctx.logger.info(f"[ACTION] Searching Hugging Face Hub for '{task}'...") # Simulation
+        # TODO: Implement actual HF Hub search if desired
+        simulated_new_model = f"hf-hub/simulated-model-for-{task}" # Simulation placeholder
+        ctx.logger.info(f"Found new model (simulated): {simulated_new_model}")
 
-        # --- MODIFIED ---: Removed simulation block.
-        # The HF Manager will find the model, run it, and return the result.
-        # It could also optionally send a system message like:
-        # "FOUND model=hf-hub/new-model-for-task task=text-generation"
-        # which our handle_message could listen for to update the KG.
+        # Add this new knowledge to MeTTa and set its count to 1
+        kg.add_new_task_model(task, simulated_new_model)
+        ctx.logger.info(f"New task and model added to MeTTa. Initial count set to 1.")
 
+        # Store sender and model_id for this request
+        ctx.storage.set(request_id, json.dumps({"sender": sender, "model_id": simulated_new_model}))
+
+        ctx.logger.info(f"[ACTION] Requesting TRANSIENT run from HF Manager for NEW model '{simulated_new_model}' (Request ID: {request_id})")
+        await ctx.send(sender, create_text_chat(f"Found new model '{simulated_new_model}' (simulated). Requesting temporary run..."))
+        
+        # Send instruction via ChatMessage
+        instruction = (
+            f"Request ID: {request_id}\n"
+            f"Mode: transient\n"
+            f"Model ID: {simulated_new_model}\n"
+            f"Task Type: {task}\n" # Use the parsed task
+            f"Prompt: {prompt}"
+        )
+        await ctx.send(HF_MANAGER_ADDRESS, create_text_chat(instruction))
 
 # --- Agent Message Handlers ---
 
-# --- MODIFIED ---: This is now the main router
+def parse_manager_response(text: str) -> Dict[str, Any]:
+    """Parses the text response from the HF Manager."""
+    print(f"Parsing manager response...\n{text}")
+    response_data = {"request_id": None, "status": "error", "message": "Could not parse manager response."}
+    lines = text.strip().split('\n')
+    try:
+        # Extract Request ID first
+        if lines[0].startswith("Request ID:"):
+            response_data["request_id"] = lines[0].split(":", 1)[1].strip()
+        else: return response_data # Cannot proceed without request ID
+
+        # Parse based on expected keywords
+        if "Transient run successful:" in text:
+            response_data["status"] = "success"
+            # Try to find JSON output block
+            match_json = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+            if match_json:
+                response_data["output"] = json.loads(match_json.group(1))
+            else:
+                 # Assume rest of the message after the status line is raw output
+                response_data["output"] = text.split("Transient run successful:", 1)[1].strip()
+
+        elif "Persistent agent deployed:" in text:
+            response_data["status"] = "success"
+            details = {}
+            for line in lines[1:]: # Skip Request ID line
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    details[key.strip().lower().replace(" ", "_")] = value.strip()
+            response_data.update(details) # Add parsed details like agent_address, etc.
+
+        elif "Error:" in text:
+            response_data["status"] = "error"
+            response_data["message"] = text.split("Error:", 1)[1].strip()
+
+        else:
+             response_data["message"] = f"Unrecognized response format from manager: {text[:100]}..."
+
+    except json.JSONDecodeError as e:
+        response_data["status"] = "error"
+        response_data["message"] = f"Failed to parse JSON output from manager: {e}"
+    except Exception as e:
+        logger.error(f"Error parsing manager response text: {e}", exc_info=True)
+        response_data["status"] = "error"
+        response_data["message"] = f"Internal error parsing manager response: {e}"
+
+    return response_data
+
+
 @chat_proto.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     """
-    Handle incoming chat messages.
-    Differentiates between new requests from callers and results from workers.
+    Handle incoming chat messages from Users OR the HF Manager Agent.
     """
-    # Always acknowledge the message
-    await ctx.send(
-        sender,
-        ChatAcknowledgement(timestamp=datetime.now(timezone.utc), acknowledged_msg_id=msg.msg_id),
-    )
+    # Try to acknowledge immediately
+    try:
+        await ctx.send(
+            sender,
+            ChatAcknowledgement(timestamp=datetime.now(timezone.utc), acknowledged_msg_id=msg.msg_id),
+        )
+    except Exception as e:
+        ctx.logger.warning(f"Failed to send ACK to {sender}: {e}")
 
-    # --- MODIFIED ---: Check if this sender is a known worker
-    known_specialists = kg.get_all_specialist_agents() # Get current list
-    is_worker_response = (sender == hf_manager_address or sender in known_specialists)
-    
-    caller_storage_key = f"caller_for_session_{ctx.session}"
+    # --- Differentiate Sender ---
+    is_start_session = any(isinstance(item, StartSessionContent) for item in msg.content)
+    text_content = next((item.text.strip() for item in msg.content if isinstance(item, TextContent)), None)
 
-    if is_worker_response:
-        # --- PATH 1: This is a RESPONSE from a worker ---
-        ctx.logger.info(f"Received a RESPONSE from worker: {sender}")
-        
-        # 1. Get the text content from the worker
-        result_text_parts = []
-        is_end_session = False
-        for item in msg.content:
-            if isinstance(item, TextContent):
-                result_text_parts.append(item.text)
-            elif isinstance(item, EndSessionContent):
-                is_end_session = True
-        
-        result_text = "\n".join(result_text_parts).strip()
-        
-        # 2. Check if this is a system notification (e.g., deployment complete)
-        #    (This is a convention you must define with your hf_manager_agent)
-        deploy_match = re.match(r"DEPLOYED\s+model_id=([^\s]+)\s+address=([^\s]+)", result_text, re.IGNORECASE)
-        found_match = re.match(r"FOUND\s+model_id=([^\s]+)\s+task=([^\s]+)", result_text, re.IGNORECASE)
-
-        if deploy_match:
-            # It's a system message: a new agent was deployed
-            model_id = deploy_match.group(1)
-            new_agent_address = deploy_match.group(2)
-            ctx.logger.info(f"System Notification: Registering new agent for '{model_id}' at {new_agent_address}")
-            kg.register_specialist_agent(model_id, new_agent_address)
-            # We don't forward this to the user, but we could if we wanted to
-            return # Stop processing
-            
-        elif found_match:
-            # It's a system message: a new model was found
-            model_id = found_match.group(1)
-            task = found_match.group(2)
-            ctx.logger.info(f"System Notification: Registering new model '{model_id}' for task '{task}'")
-            kg.add_new_task_model(task, model_id)
-            return # Stop processing
-
-        # 3. If not a system message, it's a RESULT. Find the original caller.
-        original_caller = ctx.storage.get(caller_storage_key)
-        
-        if not original_caller:
-            ctx.logger.error(f"Received result from {sender} but could not find original caller for session {ctx.session}. Ignoring.")
+    # --- Case 1: Message from HF Manager Agent ---
+    if sender == HF_MANAGER_ADDRESS:
+        ctx.logger.info(f"Received reply from HF Manager: {text_content[:100]}...")
+        if not text_content:
+            ctx.logger.warning("Received empty message from HF Manager.")
             return
 
-        # 4. Forward the result to the original caller
-        if not result_text:
-            result_text = "[Received empty response from worker]"
-            
-        ctx.logger.info(f"Forwarding result from {sender} to original caller {original_caller}")
-        result_msg = create_text_chat(result_text, end_session=is_end_session)
-        await ctx.send(original_caller, result_msg)
-        
-        # 5. If session ended, clean up storage
-        if is_end_session:
-            ctx.storage.delete(caller_storage_key)
-            
-    else:
-        # --- PATH 2: This is a NEW REQUEST from a caller ---
-        ctx.logger.info(f"Received a new REQUEST from caller: {sender}")
-        
-        # --- MODIFIED ---: Store the caller's address for this session!
-        # This is the most important part.
-        ctx.storage.set(caller_storage_key, sender)
+        # Parse the manager's text response
+        parsed_response = parse_manager_response(text_content)
+        request_id = parsed_response.get("request_id")
 
-        for item in msg.content:
-            if isinstance(item, StartSessionContent):
-                ctx.logger.info(f"Got a start session message from {sender}")
-                await ctx.send(sender, create_text_chat("Hello! I am the HF Orchestrator Agent. How can I help? (e.g., 'generate text about robots')"))
-                continue
-            
-            elif isinstance(item, TextContent):
-                user_query = item.text.strip()
-                ctx.logger.info(f"Processing query from {sender}: {user_query}")
-                
-                try:
-                    # Call the main logic function to dispatch the task
-                    await main_orchestrator_logic(ctx, sender, user_query, kg)
-                
-                except Exception as e:
-                    ctx.logger.error(f"Error processing query: {e}", exc_info=True)
-                    await ctx.send(sender, create_text_chat(f"I'm sorry, an internal error occurred: {e}"))
-            
-            elif isinstance(item, EndSessionContent):
-                ctx.logger.info(f"Session ended by caller {sender}")
-                # Clean up session data
-                ctx.storage.delete(caller_storage_key)
+        if not request_id:
+            ctx.logger.error(f"Could not extract request_id from manager response: {text_content[:100]}...")
+            # Maybe send an error back to manager? For now, just log.
+            return
 
+        # Retrieve original sender and model_id
+        stored_data_json = ctx.storage.get(request_id)
+        if not stored_data_json:
+            ctx.logger.warning(f"Could not find original sender/model_id for request ID: {request_id}. Ignoring manager response.")
+            return
+
+        try:
+            stored_data = json.loads(stored_data_json)
+            original_sender = stored_data.get("sender")
+            model_id = stored_data.get("model_id") # Needed for KG update
+            if not original_sender or not model_id:
+                raise ValueError("Missing sender or model_id in stored data")
+        except (json.JSONDecodeError, ValueError) as e:
+             ctx.logger.error(f"Failed to parse stored data for request {request_id}: {e}. Data: {stored_data_json}")
+             return
+
+        # Process parsed response and reply to original user
+        reply_message = "An unexpected response was received from the manager."
+        if parsed_response["status"] == "success":
+            if "output" in parsed_response: # Transient success
+                ctx.logger.info(f"Transient run successful for {model_id} (Req ID: {request_id}).")
+                # Format output potentially based on type
+                if isinstance(parsed_response['output'], dict):
+                     formatted_output = json.dumps(parsed_response['output'], indent=2)
+                else:
+                     formatted_output = str(parsed_response['output'])
+                reply_message = f"Result for '{model_id}':\n```\n{formatted_output}\n```"
+
+            elif "agent_address" in parsed_response: # Persistent success
+                agent_addr = parsed_response.get("agent_address")
+                agent_name = parsed_response.get("agent_name", "Unknown")
+                endpoint = parsed_response.get("endpoint", "N/A")
+                ctx.logger.info(f"Persistent agent deployed for {model_id} (Req ID: {request_id}). Address: {agent_addr}")
+
+                # Register the new agent in our knowledge graph
+                kg.register_specialist_agent(model_id, agent_addr)
+                ctx.logger.info(f"Updated KG: Specialist for {model_id} is at {agent_addr}")
+
+                reply_message = (
+                    f"Successfully deployed a dedicated agent for '{model_id}'!\n"
+                    f"Name: {agent_name}\n"
+                    f"Address: {agent_addr}\n"
+                    f"Endpoint: {endpoint}\n"
+                    f"You can interact with it directly for future requests."
+                )
             else:
-                ctx.logger.info(f"Got unexpected content type from {sender}: {type(item)}")
+                 ctx.logger.warning(f"Manager success response for {request_id} lacked output/agent details.")
+                 reply_message = "Manager reported success, but no result details were provided."
+
+        elif parsed_response["status"] == "error":
+            ctx.logger.error(f"HF Manager error for request {request_id} ({model_id}): {parsed_response.get('message')}")
+            reply_message = f"Sorry, there was an error processing your request for '{model_id}':\n{parsed_response.get('message')}"
+
+        else:
+            ctx.logger.warning(f"Received unknown status '{parsed_response.get('status')}' from Manager for request {request_id}.")
+            reply_message = f"Received an unclear response from the processing agent."
+
+        # Send the final reply to the original user
+        await ctx.send(original_sender, create_text_chat(reply_message))
+
+        # Clean up storage for this request ID
+        ctx.storage.delete(request_id)
+
+    # --- Case 2: Message is a Start Session from User ---
+    elif is_start_session:
+        ctx.logger.info(f"Got a start session message from USER {sender}")
+        await ctx.send(sender, create_text_chat("Hello! I am the HF Orchestrator Agent. How can I help you generate content? (e.g., 'generate <task> <prompt>')"))
+
+    # --- Case 3: Message is a Text Query from User ---
+    elif text_content:
+        ctx.logger.info(f"Processing query from USER {sender}: {text_content}")
+        try:
+            # Call the main logic function to handle the user's request
+            await main_orchestrator_logic(ctx, sender, text_content, kg)
+        except Exception as e:
+            ctx.logger.error(f"Error processing user query: {e}", exc_info=True)
+            await ctx.send(sender, create_text_chat(f"I'm sorry, an internal error occurred while processing your request."))
+
+    # --- Case 4: Other (Ignore) ---
+    else:
+         ctx.logger.info(f"Got unexpected or empty content from {sender}")
 
 
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
     """Handle chat acknowledgements."""
-    ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.acknowledged_msg_id}")
+    ctx.logger.debug(f"Got an acknowledgement from {sender} for {msg.acknowledged_msg_id}")
 
 # Register the protocol
 agent.include(chat_proto, publish_manifest=True)
 
-
+# Fund agent if low
 fund_agent_if_low(agent.wallet.address())
 
 if __name__ == "__main__":
-    logger.info(f"Starting agent '{agent.name}' on address: {agent.address}")
+    logger.info(f"Starting agent '{agent.name}' on address: {agent.address} | Port: {AGENT_PORT}")
     agent.run()
+

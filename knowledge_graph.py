@@ -54,7 +54,7 @@ class OrchestratorKnowledgeGraph:
             '(= (model-for-task "text-generation" "default") "microsoft/Phi-3-mini-4k-instruct")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
-            '(= (model-for-task "text-summarization" "default") "sshleifer/distilbart-cnn-12-6")'
+            '(= (model-for-task "text-summarization" "default") "gpt2")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (model-for-task "sentiment-analysis" "default") "distilbert/distilbert-base-uncased-finetuned-sst-2-english")'
@@ -76,7 +76,7 @@ class OrchestratorKnowledgeGraph:
             '(= (usage-count "microsoft/Phi-3-mini-4k-instruct") 0)'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
-            '(= (usage-count "sshleifer/distilbart-cnn-12-6") 0)'
+            '(= (usage-count "gpt2") 0)'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (usage-count "distilbert/distilbert-base-uncased-finetuned-sst-2-english") 0)'
