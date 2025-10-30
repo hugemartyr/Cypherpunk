@@ -215,13 +215,13 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                 # here we will recieve message from HF_agent about new deployed agent address
                 
                 
-                # Simulate a new address and update the knowledge graph
-                new_agent_address = f"agent1q...simulated-addr-for-new-agent"
-                kg.register_specialist_agent(model_id, new_agent_address)
+                # # Simulate a new address and update the knowledge graph
+                # new_agent_address = f"agent1q...simulated-addr-for-new-agent"
+                # kg.register_specialist_agent(model_id, new_agent_address)
                 
-                ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
-                response_text_2 = f"generate a persistant chat model with HF model_id = '{model_id}' and task_type = 'auto' and give me the address of new deployed agent."
-                await ctx.send(hf_manager_address, create_text_chat(response_text_2))
+                # ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
+                # response_text_2 = f"generate a persistant chat model with HF model_id = '{model_id}' and task_type = 'auto' and give me the address of new deployed agent."
+                # await ctx.send(hf_manager_address, create_text_chat(response_text_2))
     
     else:
         # --- PATH 2: No, I don't have knowledge ---
@@ -298,12 +298,20 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
             ctx.logger.info(f"Got message from HF Manager: {item.text}")
             if(item.text=="Tool executed successfully."):
                 ctx.logger.info(f"Tool executed successfully.")
-                # send ack to caller agent
-                await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(type="text", text="Tool executed successfully.")]))
+                # # send ack to caller agent
+                # await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(type="text", text="Tool executed successfully.")]))
                 
-            else:
+            if("Hugging Face Persistent Model Agent started at address:" in item.text):
+                
                 ctx.logger.info(f"Message from HF Manager: {item.text}")
-
+                # Extract the address from the message
+                match = re.search(r"Hugging Face Persistent Model Agent started at address: (\S+) for model (\S+)", item.text)
+                if match:
+                    new_agent_address = match.group(1)
+                    model_id = match.group(2)
+                    ctx.logger.info(f"New agent address: {new_agent_address} for model: {model_id}")
+                    # add address to metta kg
+                    kg.register_specialist_agent(new_agent_address, model_id)
 
 
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)

@@ -1,249 +1,3 @@
-# import os
-# import sys
-# import subprocess
-# import json
-# from typing import Dict, Any
-# import time
-# import signal
-# import requests
-
-# from uagents import Agent, Protocol, Context, Model
-
-# #import the necessary components from the chat protocol
-# from uagents_core.contrib.protocols.chat import (
-#     ChatAcknowledgement,
-#     ChatMessage,
-#     TextContent,
-#     chat_protocol_spec,
-# )
-
-# # Define the directory for persistent models
-# MODELS_DIR = "Agent_Models"
-# API_KEY = os.getenv("ASI_ONE_API_KEY")
-# BASE_URL = "https://api.asi1.ai/v1/chat/completions"
-# MODEL = "asi1-mini"
-
-
-# from specialist_agent_runner_script import generate_persistent_runner_content
-# from transient_runner_script import generate_transient_runner_content
-
-# curr_port = 6001
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (unchanged)."""
-#     filename = "hf_transient_runner.py"
-#     try:
-#         with open(filename, "w", encoding="utf-8") as f:
-#             f.write(generate_transient_runner_content())
-
-#         command = [sys.executable, filename, model_id, prompt, task_type]
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if result.returncode != 0 or not stdout:
-#             return {"success": False, "error": stderr or "Unknown failure"}
-#         return json.loads(stdout)
-#     except Exception as e:
-#         return {"success": False, "error": str(e)}
-#     finally:
-#         if os.path.exists(filename):
-#             os.remove(filename)
-
-# def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path B: Persistent Run (using improved runner with embedded parameters)."""
-#     os.makedirs(MODELS_DIR, exist_ok=True)
-#     model_safe = model_id.replace("/", "__").replace("-", "_")
-#     model_safe += "_model"
-#     model_dir = os.path.join(MODELS_DIR, model_safe)
-#     os.makedirs(model_dir, exist_ok=True)
-
-#     runner_file = os.path.join(model_dir, "runner.py")
-#     log_file = os.path.join(model_dir, "log.txt")
-#     global curr_port
-#     curr_port += 1
-#     script_content = generate_persistent_runner_content(model_id, curr_port, task_type, log_file)
-
-#     # Write the runner script
-#     with open(runner_file, "w", encoding="utf-8") as f:
-#         f.write(script_content)
-
-#     # Clear previous logs if any
-#     if os.path.exists(log_file):
-#         os.remove(log_file)
-
-#     # command = [sys.executable, runner_file]
-#     # process = subprocess.Popen(command, cwd=model_dir, text=True)
-#     # time.sleep(5)
-
-#     return {
-#         "success": True,
-#         # "pid": process.pid,
-#         "runner": runner_file,
-#         "log": log_file,
-#         "status": f"Model {model_id} started in persistent mode with embedded parameters."
-#     }
-
-# run_transient_model_schema={
-#     "type": "object",
-#     "function": {
-#         "name": "run_transient_model",
-#         "description": "Run a HuggingFace model in transient mode (single-use).",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "model_id": {
-#                     "type": "string",
-#                     "description": "The HuggingFace model ID (e.g., 'gpt2', 'facebook/bart-large-cnn')."
-#                 },
-#                 "prompt": {
-#                     "type": "string",
-#                     "description": "The input prompt or text for the model."
-#                 },
-#                 "task_type": {
-#                     "type": "string",
-#                     "description": "The task type for the model (e.g., 'text-generation', 'summarization', 'translation'). Use 'auto' to infer.",
-#                     "default": "auto"
-#                 }
-#             },
-#             "required": ["model_id", "prompt"],
-#             "additionalProperties": False
-#         }
-#     }
-# }
-
-# run_persistent_model_schema={
-#     "type": "object",
-#     "function": {
-#         "name": "run_persistent_model",
-#         "description": "Run a HuggingFace model in persistent mode (long-running).",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "model_id": {
-#                     "type": "string",
-#                     "description": "The HuggingFace model ID (e.g., 'gpt2', 'facebook/bart-large-cnn')."
-#                 },
-#                 "task_type": {
-#                     "type": "string",
-#                     "description": "The task type for the model (e.g., 'text-generation', 'summarization', 'translation'). Use 'auto' to infer.",
-#                     "default": "auto"
-#                 }
-#             },
-#             "required": ["model_id"],
-#             "additionalProperties": False
-#         }
-#     }
-# }
-# # -----------------------------------------
-# # --- Main Interface ---
-# # -----------------------------------------
-
-
-# # Intialise agent1
-# agent = Agent(
-#     name="HF_MANAGEMENT_AGENT",
-#     port=5060,
-#     endpoint=["http://localhost:5060/submit"],
-# )
-
-# # Initialize the chat protocol
-# chat_proto = Protocol(spec=chat_protocol_spec)
-# agent.include(chat_proto, publish_manifest=True)
-
-
-
-# messages =[
-#     {"role": "user", "content": "This is the HuggingFace Model Management Agent. It can run HuggingFace models in transient or persistent modes,If you think the request is persistent use run_persistent_model or use run_transient_model if you think there will only be one request. Use the available tools to run models as needed."}
-# ]
-
-# @agent.on_event('startup')
-# async def startup_handler(ctx : Context):
-#     ctx.logger.info(f' My name is {ctx.agent.name} and my address  is {ctx.agent.address}')
-    
-# # Message Handler - Process received messages and send acknowledgements
-# @chat_proto.on_message(ChatMessage)
-# async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-#     for item in msg.content:
-#         if isinstance(item, TextContent):
-#             # Log received message
-#             ctx.logger.info(f"Received message from {sender}: {item.text}")
-            
-#             # Send acknowledgment
-#             ack = ChatAcknowledgement(
-#                 timestamp=datetime.utcnow(),
-#                 acknowledged_msg_id=msg.msg_id
-#             )
-#             await ctx.send(sender, ack)
-            
-            
-#             # process request 
-#             resp = requests.post(
-#                 BASE_URL,
-#                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-#                 json={"model": MODEL, "messages": messages, "tools": [run_transient_model_schema, run_persistent_model_schema]},
-#             ).json()
-
-
-#             choice = resp["choices"][0]["message"]
-#             if "tool_calls" not in choice:
-#                 print("Model replied normally:", choice["content"])
-#                 exit()
-
-#             tool_call = choice["tool_calls"][0]
-#             print("Tool-call from model:", json.dumps(tool_call, indent=2))
-#             # Extract arguments
-#             arg_str = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments")
-#             args = json.loads(arg_str)
-#             print("Parsed arguments:", args)
-            
-#             if tool_call["name"] == "run_transient_model":
-#                 result = run_transient_model(**args)
-#             elif tool_call["name"] == "run_persistent_model":
-#                 result = run_persistent_model(**args)
-#             else:
-#                 result = {"success": False, "error": "Unknown tool called."}
-#             print(f"Backend tool result: {json.dumps(result, indent=2)}")
-            
-#             # # Send response message
-#             # response = ChatMessage(
-#             #     timestamp=datetime.utcnow(),
-#             #     msg_id=uuid4(),
-#             #     content=[TextContent(type="text", text="Hello from Agent1!")]
-#             # )
-#             # await ctx.send(sender, response)
-
-# # Acknowledgement Handler - Process received acknowledgements
-# @chat_proto.on_message(ChatAcknowledgement)
-# async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
-#     ctx.logger.info(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
-    
-        
-# def main():
-#     print("=" * 80)
-#     print("HuggingFace Model Orchestrator")
-#     print("=" * 80)
-#     print("1. Path A: Transient Run")
-#     print("2. Path B: Persistent Run")
-#     choice = input("Enter choice (1 or 2): ").strip()
-
-#     model_id = input("Model ID: ").strip()
-    
-#     task_type = input("Task Type (press Enter for auto): ").strip() or "auto"
-
-#     if choice == "1":
-#         prompt = input("Prompt: ").strip()
-#         res = run_transient_model(model_id, prompt, task_type)
-#         print(json.dumps(res, indent=2))
-#     elif choice == "2":
-#         res = run_persistent_model(model_id, task_type)
-#         print(json.dumps(res, indent=2))
-#     else:
-#         print("Invalid choice.")
-
-# if __name__ == "__main__":
-#     main()
-
-
 import os
 import sys
 import subprocess
@@ -269,6 +23,63 @@ from uagents_core.contrib.protocols.chat import (
     StartSessionContent,
     chat_protocol_spec,
 )
+
+import subprocess
+import sys
+import os
+import re  # Added for regex matching
+import time # Added for startup timeout
+import atexit # Added for cleanup on exit
+import signal # Added for cleanup on Ctrl+C
+import psutil # New dependency: pip install psutil
+from typing import Dict, Any, List
+
+# (Assuming 'logger', 'MODELS_DIR', 'curr_port', 
+# 'generate_persistent_runner_content' are defined elsewhere in your file)
+
+# --- Process Cleanup Setup ---
+
+# Global list to track child processes for cleanup
+child_processes: List[psutil.Process] = []
+
+def cleanup_child_processes():
+    """
+    Terminates all child processes started by this script.
+    """
+    logger.info(f"Cleaning up {len(child_processes)} child process(es)...")
+    for proc in child_processes:
+        try:
+            # Find all children of the process (the agent might spawn its own)
+            children = proc.children(recursive=True)
+            for child in children:
+                logger.debug(f"Terminating grandchild process {child.pid}")
+                child.terminate()
+            
+            # Terminate the main child process
+            logger.debug(f"Terminating child process {proc.pid}")
+            proc.terminate()
+            
+            proc.wait(timeout=3) # Wait max 3 seconds
+        except psutil.NoSuchProcess:
+            logger.debug(f"Process {proc.pid} already terminated.")
+        except psutil.TimeoutExpired:
+            logger.warning(f"Process {proc.pid} did not terminate, killing.")
+            proc.kill()
+        except Exception as e:
+            logger.error(f"Error during cleanup of process {proc.pid}: {e}")
+
+# Register the cleanup function to run on normal script exit
+atexit.register(cleanup_child_processes)
+
+def signal_handler(sig, frame):
+    """Handle signals like SIGINT (Ctrl+C)."""
+    logger.info("Signal received, initiating cleanup and exit...")
+    # The atexit handler will automatically run
+    sys.exit(0)
+
+# Register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
 
 # --- Configuration ---
 dotenv.load_dotenv()
@@ -296,12 +107,8 @@ MODELS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "Agent_Models")) # Persist
 os.makedirs(MODELS_DIR, exist_ok=True)
 
 # Port counter for persistent agents
-curr_port = AGENT_PORT + 1 # Start ports for specialists after the manager's port
-
-# --- Tool Implementations ---
-
-# Assume these functions are defined in separate files
-
+# curr_port = AGENT_PORT + 1 # Start ports for specialists after the manager's port
+curr_port = 6000 + 1 # Start ports for specialists after the manager's port
 from specialist_agent_runner_script import generate_persistent_runner_content
 from transient_runner_script import generate_transient_runner_content
 
@@ -314,92 +121,6 @@ class HFManagerChat(Model):
 class HFManagerChatAcknowledgement(Model):
     ChatAcknowledgement: ChatAcknowledgement
     caller_Agent_address: str
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (unchanged)."""
-#     filename = "hf_transient_runner.py"
-#     try:
-#         with open(filename, "w", encoding="utf-8") as f:
-#             f.write(generate_transient_runner_content())
-
-#         command = [sys.executable, filename, model_id, prompt, task_type]
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if result.returncode != 0 or not stdout:
-#             return {"success": False, "error": stderr or "Unknown failure"}
-#         return json.loads(stdout)
-#     except Exception as e:
-#         return {"success": False, "error": str(e)}
-#     finally:
-#         if os.path.exists(filename):
-#             os.remove(filename)
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (single-use inference)."""
-#     model_id.replace('"', '') # Sanitize input
-#     repr(model_id)
-#     model_id="'"+model_id+"'"
-#     repr(prompt)
-    
-#     print(f"[DEBUG] Running transient model: {model_id} with prompt: {prompt} and task_type: {task_type}")
-#     filename = f"hf_transient_runner_{uuid4()}.py" # Unique filename
-#     runner_path = os.path.join(SCRIPT_DIR, filename) # Place in script dir
-#     logger.info(f"Starting transient run for {model_id} with script {filename}")
-#     try:
-#         # Generate the runner script content
-#         script_content = generate_transient_runner_content(model_id, prompt, task_type)
-#         if not script_content:
-#              raise ValueError("Failed to generate transient runner script content.")
-
-#         with open(runner_path, "w", encoding="utf-8") as f:
-#             f.write(script_content)
-
-#         # Ensure the script uses the correct Python executable (from the current venv)
-#         python_executable = sys.executable
-#         command = [python_executable, runner_path]
-
-#         # Increased timeout for model download/run
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=900) # 15 min timeout
-        
-        
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if stderr:
-#             logger.warning(f"Transient runner STDERR for {model_id}:\n{stderr}")
-
-#         if result.returncode != 0 or not stdout:
-#             error_message = stderr or f"Unknown failure (return code {result.returncode})"
-#             logger.error(f"Transient run failed for {model_id}: {error_message}")
-#             return {"status": "error", "message": error_message}
-
-#         logger.info(f"Transient run successful for {model_id}. Output length: {len(stdout)}")
-#         # Attempt to parse JSON output
-#         try:
-#             output_json = json.loads(stdout)
-#             # Ensure status is success if parsing works
-#             if isinstance(output_json, dict) and "status" not in output_json:
-#                  output_json["status"] = "success"
-#             return output_json
-#         except json.JSONDecodeError:
-#             logger.warning(f"Transient runner output for {model_id} was not valid JSON. Returning raw output.")
-#             return {"status": "success", "output": stdout} # Return raw output if not JSON
-
-#     except subprocess.TimeoutExpired:
-#         logger.error(f"Transient run timed out for {model_id}")
-#         return {"status": "error", "message": "Process timed out after 15 minutes."}
-#     except Exception as e:
-#         logger.error(f"Error during transient run for {model_id}: {e}", exc_info=True)
-#         return {"status": "error", "message": str(e)}
-#     finally:
-#         # Cleanup the temporary script
-#         if os.path.exists(runner_path):
-#             try:
-#                 os.remove(runner_path)
-#                 logger.debug(f"Cleaned up transient script: {filename}")
-#             except OSError as e:
-#                 logger.warning(f"Could not remove transient script {filename}: {e}")
-
 
 def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
     """
@@ -487,20 +208,107 @@ def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> 
                 logger.warning(f"Could not remove transient script {filename}: {e}")
                 
                 
+# def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, Any]:
+#     """Executes Path B: Persistent Run (starts a long-running specialist agent)."""
+#     model_id.replace('"', '') # Sanitize input
+#     repr(model_id)
+#     repr(task_type)
+
+#     print(f"[DEBUG] Running persistent model: {model_id} with task_type: {task_type}")
+#     global curr_port
+#     port_to_use = curr_port
+#     curr_port += 1 # Increment for the next one
+
+#     logger.info(f"Starting persistent agent for {model_id} on port {port_to_use}")
+
+#     # Create a safe directory name
+#     model_safe = model_id.replace("/", "__").replace("-", "_")
+#     model_safe += "_model"
+#     model_dir = os.path.join(MODELS_DIR, model_safe)
+#     os.makedirs(model_dir, exist_ok=True)
+
+#     runner_file = os.path.join(model_dir, "runner.py")
+#     log_file = os.path.join(model_dir, "log.txt")
+
+#     # Generate the specialist agent script content
+#     script_content = generate_persistent_runner_content(model_id,  port_to_use, task_type, log_file=log_file)
+#     if not script_content:
+#         error_msg = f"Failed to generate persistent runner script content for {model_id}"
+#         logger.error(error_msg)
+#         return {"status": "error", "message": error_msg}
+
+#     # Write the runner script
+#     with open(runner_file, "w", encoding="utf-8") as f:
+#         f.write(script_content)
+
+#     # Ensure the script uses the correct Python executable (from the current venv)
+#     python_executable = sys.executable
+#     command = [python_executable, runner_file]
+    
+    
+    
+#     # TODO: Actually
+#     # need to run the agent and give the agent address back
+    
+    
+    
+
+#     # try:
+#     #     # Start the specialist agent as a background process
+#     #     # Use Popen for non-blocking start. We don't wait for it here.
+#     #     process = subprocess.Popen(
+#     #         command,
+#     #         cwd=model_dir, # Run from the model's directory
+#     #         stdout=subprocess.PIPE, # Capture output if needed, but primarily check logs
+#     #         stderr=subprocess.PIPE,
+#     #         text=True,
+#     #         # Use start_new_session on non-Windows to detach from parent
+#     #         start_new_session=True if sys.platform != "win32" else False
+#     #     )
+#     #     logger.info(f"Started persistent agent process for {model_id} with PID {process.pid}")
+
+#     #     # Give it a moment to start up
+#     #     time.sleep(5)
+
+#     #     # Check if the process is still running (basic check)
+#     #     if process.poll() is not None: # Process terminated early
+#     #         stdout, stderr = process.communicate()
+#     #         error_msg = f"Persistent agent for {model_id} failed to start. Return code: {process.returncode}. Stderr: {stderr}"
+#     #         logger.error(error_msg)
+#     #         return {"status": "error", "message": error_msg}
+
+#     #     # Return success with info on how to access the agent
+#     #     return {
+#     #         "status": "success",
+#     #         "message": f"Model {model_id} started in persistent mode.",
+#     #         "agent_name": f"{model_id.replace('/', '_')}_specialist",
+#     #         "port": port_to_use,
+#     #         "endpoint": f"http://localhost:{port_to_use}/submit", # Assuming local deployment
+#     #         "log_file": log_file,
+#     #         "pid": process.pid
+#     #     }
+#     # except Exception as e:
+#     #     logger.error(f"Error starting persistent agent for {model_id}: {e}", exc_info=True)
+#     #     return {"status": "error", "message": f"Failed to start persistent process: {str(e)}"}
+    
 def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, Any]:
-    """Executes Path B: Persistent Run (starts a long-running specialist agent)."""
-    model_id.replace('"', '') # Sanitize input
-    repr(model_id)
-    repr(task_type)
+    """
+    Executes Path B: Persistent Run.
+    Starts a long-running specialist agent as a subprocess,
+    captures its address, and ensures it's cleaned up on exit.
+    """
+    
+    # Sanitize input (assign the result back)
+    model_id = model_id.replace('"', '')
 
     print(f"[DEBUG] Running persistent model: {model_id} with task_type: {task_type}")
     global curr_port
     port_to_use = curr_port
     curr_port += 1 # Increment for the next one
 
-    logger.info(f"Starting persistent agent for {model_id} on port {port_to_use}")
+    logger.info(f"Attempting to start persistent agent for {model_id} on port {port_to_use}")
 
-    # Create a safe directory name
+    # --- 1. Create the Runner Script ---
     model_safe = model_id.replace("/", "__").replace("-", "_")
     model_safe += "_model"
     model_dir = os.path.join(MODELS_DIR, model_safe)
@@ -509,72 +317,93 @@ def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, An
     runner_file = os.path.join(model_dir, "runner.py")
     log_file = os.path.join(model_dir, "log.txt")
 
-    # Generate the specialist agent script content
     script_content = generate_persistent_runner_content(model_id,  port_to_use, task_type, log_file=log_file)
     if not script_content:
         error_msg = f"Failed to generate persistent runner script content for {model_id}"
         logger.error(error_msg)
         return {"status": "error", "message": error_msg}
 
-    # Write the runner script
     with open(runner_file, "w", encoding="utf-8") as f:
         f.write(script_content)
 
-    # Ensure the script uses the correct Python executable (from the current venv)
+    # --- 2. Launch the Subprocess ---
     python_executable = sys.executable
     command = [python_executable, runner_file]
     
+    # Regex to capture the agent address
+    address_regex = re.compile(r"Starting agent with address: (agent1[a-zA-Z0-9]+)")
+    agent_address = None
+    STARTUP_TIMEOUT = 20 # 20 seconds
     
-    
-    # TODO: Actually
-    # need to run the agent and give the agent address back
-    
-    
-    
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=model_dir,
+            stdout=subprocess.PIPE,    # Capture stdout
+            stderr=subprocess.PIPE,    # Capture stderr
+            text=True,                 # Decode as text 
+            bufsize=1,                 # Line-buffered
+        )
+        
+        # Add to global list for cleanup
+        child_processes.append(psutil.Process(process.pid))
+        logger.info(f"Started persistent agent process for {model_id} with PID {process.pid}")
 
-    # try:
-    #     # Start the specialist agent as a background process
-    #     # Use Popen for non-blocking start. We don't wait for it here.
-    #     process = subprocess.Popen(
-    #         command,
-    #         cwd=model_dir, # Run from the model's directory
-    #         stdout=subprocess.PIPE, # Capture output if needed, but primarily check logs
-    #         stderr=subprocess.PIPE,
-    #         text=True,
-    #         # Use start_new_session on non-Windows to detach from parent
-    #         start_new_session=True if sys.platform != "win32" else False
-    #     )
-    #     logger.info(f"Started persistent agent process for {model_id} with PID {process.pid}")
+        start_time = time.time()
+        
+        # --- 3. Read STDOUT to find the address ---
+        for line in iter(process.stdout.readline, ''):
+            line = line.strip()
+            if not line:
+                continue
+                
+            logger.info(f"[Runner STDOUT - {model_id}]: {line}") # Log runner output
+            
+            # Check for address
+            match = address_regex.search(line)
+            if match:
+                agent_address = match.group(1)
+                logger.info(f"Successfully captured agent address for {model_id}: {agent_address}")
+                break # Success!
+            
+            # Check for timeout
+            if time.time() - start_time > STARTUP_TIMEOUT:
+                logger.error(f"Timeout: Agent {model_id} (PID {process.pid}) failed to report address in {STARTUP_TIMEOUT}s.")
+                # We kill it here; atexit will handle the rest
+                process.kill()
+                stderr_output = process.stderr.read()
+                return {"status": "error", "message": f"Timeout waiting for agent to start. Stderr: {stderr_output}"}
+            
+            # Check if process died prematurely
+            if process.poll() is not None:
+                logger.error(f"Agent process {model_id} (PID {process.pid}) terminated prematurely.")
+                break # Exit loop
+        
+        # --- 4. Handle Results ---
+        if agent_address is None:
+            # Process terminated before address was found
+            stderr_output = process.stderr.read()
+            logger.error(f"Agent {model_id} failed to start. Return code: {process.returncode}. Stderr: {stderr_output}")
+            return {"status": "error", "message": f"Agent failed to start. Stderr: {stderr_output}"}
+        
+        
 
-    #     # Give it a moment to start up
-    #     time.sleep(5)
-
-    #     # Check if the process is still running (basic check)
-    #     if process.poll() is not None: # Process terminated early
-    #         stdout, stderr = process.communicate()
-    #         error_msg = f"Persistent agent for {model_id} failed to start. Return code: {process.returncode}. Stderr: {stderr}"
-    #         logger.error(error_msg)
-    #         return {"status": "error", "message": error_msg}
-
-    #     # Return success with info on how to access the agent
-    #     return {
-    #         "status": "success",
-    #         "message": f"Model {model_id} started in persistent mode.",
-    #         "agent_name": f"{model_id.replace('/', '_')}_specialist",
-    #         "port": port_to_use,
-    #         "endpoint": f"http://localhost:{port_to_use}/submit", # Assuming local deployment
-    #         "log_file": log_file,
-    #         "pid": process.pid
-    #     }
-    # except Exception as e:
-    #     logger.error(f"Error starting persistent agent for {model_id}: {e}", exc_info=True)
-    #     return {"status": "error", "message": f"Failed to start persistent process: {str(e)}"}
-    
-    
+        # Return success with the agent address
+        return {
+            "status": "success",
+            "message": f"Model {model_id} started in persistent mode.",
+            "agent_name": f"{model_id.replace('/', '_')}_specialist",
+            "agent_address": agent_address, # The captured address
+            "port": port_to_use,
+            "endpoint": f"http://localhost:{port_to_use}/submit",
+            "log_file": log_file,
+            "pid": process.pid
+        }
+    except Exception as e:
+        logger.error(f"Error starting persistent agent for {model_id}: {e}", exc_info=True)
+        return {"status": "error", "message": f"Failed to start persistent process: {str(e)}"}    
 
 # --- Tool Schemas for ASI:One ---
-# Keep schemas consistent with function definitions
-
 run_transient_model_schema={
     "type": "function",
     "function": {
@@ -785,20 +614,15 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     # Clean up history for the session
     conversations.pop(session_id, None)
 
-
-    
-    
+ 
     
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
-    
 
-    
-    
+
 # handle messages from ORC agent
 # --- Corrected Message Handlers ---
-
 @new_chat_protocol.on_message(HFManagerChat)
 async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManagerChat):
 
@@ -852,7 +676,16 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
             elif tool_type == "persistent":
                 # Note: This ignores parts[3] (the prompt) if provided,
                 # as the persistent tool doesn't take one.
+                repr(model_id)
                 tool_result =  run_persistent_model(model_id=model_id)
+                
+                new_deployed_agent_address = tool_result.get("agent_address", "unknown_address")
+                if(new_deployed_agent_address != "unknown_address"):
+                    response_text = f"Hugging Face Persistent Model Agent started at address: {new_deployed_agent_address} for model {model_id}."
+                    logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
+                    await ctx.send(sender, #ORC agent
+                                   HFManagerChat(ChatMessage= ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
+    
                 
             else:
                 error_msg = f"Error: Unknown tool type '{tool_type}'. Must be 'transient' or 'persistent'."
@@ -863,7 +696,7 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
 
     # 4. Formulate and send the response
     if tool_result:
-        response_text = f"Tool executed successfully. Result: {tool_result.get('output', 'No result string.')}"
+        response_text = f"Hugging Face Model Response: {tool_result.get('output', 'No result string.')}"
     else:
         response_text = error_msg or "Error: An unknown error occurred."
 
@@ -872,23 +705,27 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
         logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
         await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=response_text)]))
     
+    elif tool_type == "persistent":
+        # persistent tool call
+        pass
+
+        # generate a sub process that runs the persistent agent
+        # and return the address of the new deployed agent
+        
+        
+        
+        
+        
     # Send confirmation/result back to the ORC agent
     # logger.info(f"Sending response to ORC agent {sender}: {response_text}")
     # await ctx.send(sender, HFManagerChat(ChatMessage=ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
 
     # The 'conversations' dictionary and cleanup are no longer needed for this logic.
 
-    
-    
-    # Clean up history for the session
-    # conversations.pop(session_id, None)
-
 
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)
 async def handle_acknowledgement_of_Manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
     ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.ChatAcknowledgement.acknowledged_msg_id}")
-
-    
 
 
 agent.include(chat_proto, publish_manifest=True)

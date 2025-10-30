@@ -1,4 +1,3 @@
-
 import sys, json, os, time, torch, signal, warnings, select
 from transformers import pipeline
 warnings.filterwarnings('ignore')
@@ -6,7 +5,7 @@ from uagents.setup import fund_agent_if_low
 
 from datetime import datetime, timezone
 from uuid import uuid4
-from uagents import Agent, Protocol, Context
+from uagents import Agent, Protocol, Context, Model
 
 #import the necessary components from the chat protocol
 from uagents_core.contrib.protocols.chat import (
@@ -15,10 +14,12 @@ from uagents_core.contrib.protocols.chat import (
     TextContent,
     chat_protocol_spec,
 )
-
+    
+    
 # === Configuration ===
 MODEL_ID = "gpt2"
 TASK_TYPE = "auto"
+PORT = 8001
 SEED_PHRASE = f"{MODEL_ID}_seed_phrase_12345"
 
 # --- Path Configuration ---
@@ -63,8 +64,8 @@ log(f"Specialist Agent starting for {MODEL_ID}")
 agent = Agent(
     name=f"{MODEL_ID}_specialist_agent",
     seed=SEED_PHRASE,
-    port=8001,
-    endpoint=["http://localhost:8001/submit"] # Example endpoint, change if using cloudflared
+    port=PORT,
+    endpoint=[f"http://localhost:{PORT}/submit"] # Example endpoint, change if using cloudflared
 )
 
 # Initialize the chat protocol
@@ -151,5 +152,3 @@ agent.include(chat_proto, publish_manifest=True)
 
 if __name__ == '__main__':
     agent.run()
-
-
