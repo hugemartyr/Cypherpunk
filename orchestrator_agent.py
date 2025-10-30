@@ -25,7 +25,7 @@ from uagents_core.contrib.protocols.chat import (
 # Import our MeTTa Knowledge Graph
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 1
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
 
 # --- Agent Configuration ---
 
@@ -133,7 +133,6 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
         prompt = match.group(2).strip()
         return task, prompt
     return None, None
-
 
 async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):    
     # 1. Parse the user's intent
@@ -258,7 +257,6 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{simulated_new_model}'...")
         response_text = f"Found new model '{simulated_new_model}' on HF Hub. [Simulating call: Running model locally...]"
         await ctx.send(sender, create_text_chat(response_text))
-
 
 
 # --- Agent Message Handlers ---

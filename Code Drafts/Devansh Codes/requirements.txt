@@ -1,5 +1,0 @@
-uagents-core
-uagents
-datetime
-uuid
-time

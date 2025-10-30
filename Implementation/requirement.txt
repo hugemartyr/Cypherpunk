@@ -1,7 +1,0 @@
-uagents
-fastapi
-uvicorn
-python-dotenv
-hyperon
-openai
-httpx
