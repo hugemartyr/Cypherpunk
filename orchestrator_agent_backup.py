@@ -157,6 +157,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         ctx.logger.info(f"Knowledge found. Preferred Model ID: {model_id}")
         
         # 3. Check if a specialist agent exists for this model
+        repr(model_id)
         specialist_agent = kg.find_specialist_agent(model_id)
         
         if specialist_agent:
@@ -165,7 +166,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             
             # [ACTION] Pass prompt to that agent
             ctx.logger.info(f"[ACTION] Forwarding prompt to specialist agent: {specialist_agent}")
-            response_text = f"Specialist agent found for '{model_id}'. [Simulating call: Forwarded prompt...]"
+            response_text = f"{prompt}"
             await ctx.send(sender, create_text_chat(response_text))
             
             # Here we would normally wait for the response from the specialist agent and forward it back to the user
@@ -195,7 +196,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             )
             
             # 5. Check if usage count meets the threshold to deploy
-            if new_count >= THRESHOLD_TO_DEPLOY_NEW_AGENT:
+            if new_count == THRESHOLD_TO_DEPLOY_NEW_AGENT: 
                 ctx.logger.info(f"Usage threshold ({THRESHOLD_TO_DEPLOY_NEW_AGENT}) reached!")
                 
                 # [ACTION] Tell HF_agent (our deploy tool) to deploy this model
@@ -248,7 +249,6 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
 
 
-
 # --- Agent Message Handlers ---
 @chat_proto.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
@@ -283,9 +283,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
     """Handle chat acknowledgements."""
     ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.acknowledged_msg_id}")
-    
-
-    
 
 @new_chat_protocol.on_message(HFManagerChat)
 async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerChat):
@@ -309,9 +306,13 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
                 if match:
                     new_agent_address = match.group(1)
                     model_id = match.group(2)
+                    repr(model_id)
                     ctx.logger.info(f"New agent address: {new_agent_address} for model: {model_id}")
                     # add address to metta kg
-                    kg.register_specialist_agent(new_agent_address, model_id)
+                    kg.register_specialist_agent(model_id, new_agent_address)
+                    print("\n\n\n\n")
+                    print_all_atoms(kg.metta)
+                    print("\n\n\n\n")
 
 
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)

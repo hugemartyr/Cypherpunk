@@ -681,11 +681,11 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
                 
                 new_deployed_agent_address = tool_result.get("agent_address", "unknown_address")
                 if(new_deployed_agent_address != "unknown_address"):
-                    response_text = f"Hugging Face Persistent Model Agent started at address: {new_deployed_agent_address} for model {model_id}."
+                    response_text = f"Hugging Face Persistent Model Agent started at address: {new_deployed_agent_address} for model {model_id}"
                     logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
                     await ctx.send(sender, #ORC agent
                                    HFManagerChat(ChatMessage= ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
-    
+
                 
             else:
                 error_msg = f"Error: Unknown tool type '{tool_type}'. Must be 'transient' or 'persistent'."

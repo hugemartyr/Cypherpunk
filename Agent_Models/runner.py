@@ -16,6 +16,14 @@ from uagents_core.contrib.protocols.chat import (
 )
     
     
+class HFManagerChat(Model):
+    ChatMessage: ChatMessage
+    caller_Agent_address: str
+class HFManagerChatAcknowledgement(Model):
+    ChatAcknowledgement: ChatAcknowledgement
+    caller_Agent_address: str
+        
+    
 # === Configuration ===
 MODEL_ID = "gpt2"
 TASK_TYPE = "auto"
@@ -68,7 +76,15 @@ agent = Agent(
     endpoint=[f"http://localhost:{PORT}/submit"] # Example endpoint, change if using cloudflared
 )
 
+
+
+
+# Why only Chat protocol?
+# The Chat protocol is specifically designed for conversational interactions, making it ideal for our use case.
+# It provides a structured way to handle messages, acknowledgments, and other chat-related events.
+
 # Initialize the chat protocol
+new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 
 @agent.on_event("startup")
@@ -98,7 +114,7 @@ async def load_model(ctx: Context):
 
 
 # Message Handler - Process received messages
-@chat_proto.on_message(ChatMessage)
+@chat_proto.on_message(ChatMessage) 
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     global pipe
     
@@ -138,6 +154,59 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                 content=[TextContent(type="text", text=response_text)]
             )
             await ctx.send(sender, response)
+
+
+# Message Handler - Process received messages
+@new_chat_protocol.on_message(HFManagerChat) 
+async def handle_message_hf_agent(ctx: Context, sender: str, msg: HFManagerChat):
+    global pipe
+    
+    for item in msg.ChatMessage.content:
+        if isinstance(item, TextContent):
+            # Log received message
+            ctx.logger.info(f"Received message from {sender}: {item.text}")
+            
+            # Send acknowledgment
+            ack = ChatAcknowledgement(
+                timestamp=datetime.now(timezone.utcnow()),
+                acknowledged_msg_id=msg.ChatMessage.msg_id
+            )
+            await ctx.send(sender, ack)
+            
+            response_text = "An error occurred."
+            try:
+                if pipe is None:
+                    ctx.logger.error("Model pipe is not initialized!")
+                    response_text = "ERROR: Model is not loaded. Please check agent logs."
+                else:
+                    new_prompt = item.text.strip() 
+                    if new_prompt:
+                        log(f"New prompt received: {new_prompt[:60]}...")
+                        resp = infer(pipe, new_prompt)
+                        log(f"Response: {resp[:150]}...")
+                        response_text = resp # This is the generated text
+                
+            except Exception as e:
+                log(f"[ERROR] Runtime: {e}")
+                response_text = f"An error occurred during inference: {e}"
+            
+            # Send the message response to the original caller
+            response = ChatMessage(
+                timestamp=datetime.now(timezone.utc),
+                msg_id=uuid4(),
+                content=[TextContent(type="text", text=response_text)]
+            )
+            await ctx.send(msg.caller_Agent_address, response)
+            
+            # skip sending back to HF Manager to avoid confusion
+
+
+@new_chat_protocol.on_message(HFManagerChatAcknowledgement)
+async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
+    """Handle chat acknowledgements."""
+    ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.ChatAcknowledgement.acknowledged_msg_id}")
+
+
 
 # Acknowledgement Handler - Process received acknowledgements
 @chat_proto.on_message(ChatAcknowledgement)

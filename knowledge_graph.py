@@ -117,7 +117,7 @@ class OrchestratorKnowledgeGraph:
 
         query = f'!(match &self (= (specialist-agent "{model_id}") $agent_addr) $agent_addr)'
         result = self.metta.run(query)
-        # print(f"[DEBUG] find_specialist_agent('{model_id}') result: {result}")
+        print(f"[DEBUG] find_specialist_agent('{model_id}') result: {result}")
         if result and result[0]:
             return str(result[0][0])
         return None
@@ -214,48 +214,57 @@ if __name__ == "__main__":
     print("--- 1. KNOWLEDGE GRAPH INITIALIZED ---")
     print_all_atoms(kg.metta)
 
-    # 2. Test: Find model for a known task
-    print("\n--- 2. TEST: Find model for 'text-generation' ---")
-    model_id = kg.find_model_for_task("text-generation")
-    print(f"Found model: {model_id}")
+    # # 2. Test: Find model for a known task
+    # print("\n--- 2. TEST: Find model for 'text-generation' ---")
+    # model_id = kg.find_model_for_task("text-generation")
+    # print(f"Found model: {model_id}")
 
-    # 3. Test: Find a specialist agent that *doesn't* exist
-    print("\n--- 3. TEST: Find specialist for 'text-generation' model ---")
-    agent = kg.find_specialist_agent("crypto-news-model-id")
-    print(f"Found agent: {agent}")
+    # # 3. Test: Find a specialist agent that *doesn't* exist
+    # print("\n--- 3. TEST: Find specialist for 'text-generation' model ---")
+    # agent = kg.find_specialist_agent("crypto-news-model-id")
+    # print(f"Found agent: {agent}")
 
-    # 4. Test: Find a specialist agent that *does* exist
-    print("\n--- 4. TEST: Find specialist for 'crypto-news' model ---")
-    model_id_crypto = kg.find_model_for_task("crypto-news")
-    print(f"Found model: {model_id_crypto}")
-    agent = kg.find_specialist_agent(model_id_crypto)
-    print(f"Found agent: {agent}")
+    # # 4. Test: Find a specialist agent that *does* exist
+    # print("\n--- 4. TEST: Find specialist for 'crypto-news' model ---")
+    # model_id_crypto = kg.find_model_for_task("crypto-news")
+    # print(f"Found model: {model_id_crypto}")
+    # agent = kg.find_specialist_agent(model_id_crypto)
+    # print(f"Found agent: {agent}")
 
-    # 5. Test: Increment usage count
-    print("\n--- 5. TEST: Increment usage for 'text-generation' model ---")
-    count1 = kg.get_usage_count(model_id)
-    print(f"Count before: {count1}")
-    count2 = kg.increment_usage_count(model_id)
-    print(f"Count after: {count2}")
-    # Verify by re-reading
-    count3 = kg.get_usage_count(model_id)
-    print(f"Count from DB: {count3}")
+    # # 5. Test: Increment usage count
+    # print("\n--- 5. TEST: Increment usage for 'text-generation' model ---")
+    # count1 = kg.get_usage_count(model_id)
+    # print(f"Count before: {count1}")
+    # count2 = kg.increment_usage_count(model_id)
+    # print(f"Count after: {count2}")
+    # # Verify by re-reading
+    # count3 = kg.get_usage_count(model_id)
+    # print(f"Count from DB: {count3}")
 
-    # 6. Test: Register a new agent
-    print("\n--- 6. TEST: Register new specialist for 'text-generation' ---")
-    new_agent_addr = "agent1q...newly-deployed-text-gen..."
-    kg.register_specialist_agent(model_id, new_agent_addr)
-    agent = kg.find_specialist_agent(model_id)
-    print(f"Found new agent: {agent}")
+    # # 6. Test: Register a new agent
+    # print("\n--- 6. TEST: Register new specialist for 'text-generation' ---")
+    # new_agent_addr = "agent1q...newly-deployed-text-gen..."
+    # kg.register_specialist_agent(model_id, new_agent_addr)
+    # agent = kg.find_specialist_agent(model_id)
+    # print(f"Found new agent: {agent}")
 
-    # 7. Test: Add a completely new task
-    print("\n--- 7. TEST: Add new task 'sound-generation' (from HF Hub) ---")
-    kg.add_new_task_model("sound-generation", "facebook/musicgen-small")
-    model = kg.find_model_for_task("sound-generation")
-    print(f"Found model: {model}")
-    count = kg.get_usage_count("facebook/musicgen-small") # Use the model_id directly
-    print(f"Initial count: {count}")
+    # # 7. Test: Add a completely new task
+    # print("\n--- 7. TEST: Add new task 'sound-generation' (from HF Hub) ---")
+    # kg.add_new_task_model("sound-generation", "facebook/musicgen-small")
+    # model = kg.find_model_for_task("sound-generation")
+    # print(f"Found model: {model}")
+    # count = kg.get_usage_count("facebook/musicgen-small") # Use the model_id directly
+    # print(f"Initial count: {count}")
     
+    # 8. Test: Register another new agent for model id
+    print("\n--- 8. TEST: Register new specialist for 'crypto-news' ---")
+    tasks=kg.register_specialist_agent("new-model-id", "agent1q...newly-deployed-crypto-news...")
+    print(f"Registered new specialist agent for 'crypto-news': {tasks}")
+    agent = kg.find_specialist_agent("new-model-id")
+    print(f"Found new agent: {agent}")
+    
+    
+    # 9. Test: Get all tasks we have knowledge of
     print("\n get all tasks we have knowledge of:")
     tasks = kg.get_tasks_whom_we_have_knowledge_of()
     print(f"Tasks we have knowledge of: {tasks}")
