@@ -123,7 +123,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             
             # Send acknowledgment
             ack = ChatAcknowledgement(
-                timestamp=datetime.now(timezone.utcnow()),
+                timestamp=datetime.utcnow(),
                 acknowledged_msg_id=msg.msg_id
             )
             await ctx.send(sender, ack)
@@ -147,7 +147,7 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             
             # Send the actual response message
             response = ChatMessage(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.utcnow(),
                 msg_id=uuid4(),
                 content=[TextContent(type="text", text=response_text)]
             )
@@ -170,7 +170,7 @@ async def handle_message_hf_agent(ctx: Context, sender: str, msg: HFManagerChat)
             
             # Send acknowledgment
             ack = ChatAcknowledgement(
-                timestamp=datetime.now(timezone.utcnow()),
+                timestamp=datetime.utcnow(),
                 acknowledged_msg_id=msg.ChatMessage.msg_id
             )
             await ctx.send(sender, ack)
@@ -194,7 +194,7 @@ async def handle_message_hf_agent(ctx: Context, sender: str, msg: HFManagerChat)
             
             # Send the message response to the original caller
             response = ChatMessage(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.utcnow(),
                 msg_id=uuid4(),
                 content=[TextContent(type="text", text=response_text)]
             )
@@ -212,6 +212,7 @@ async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAck
 fund_agent_if_low(agent.wallet.address())
 # Include the protocol in the agent
 agent.include(chat_proto, publish_manifest=True)
+agent.include(new_chat_protocol, publish_manifest=True)
 
 if __name__ == '__main__':
     agent.run()

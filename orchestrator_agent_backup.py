@@ -25,7 +25,7 @@ from uagents_core.contrib.protocols.chat import (
 # Import our MeTTa Knowledge Graph
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 1
 
 # --- Agent Configuration ---
 
@@ -85,7 +85,7 @@ def create_text_hf_agent_chat(text: str, caller_agent_address: str, end_session:
     
     return HFManagerChat(
         ChatMessage=ChatMessage(
-            timestamp=datetime.now(timezone.utc),
+            timestamp=datetime.utcnow(),
             msg_id=uuid4(), 
             content=content,
         ),  
@@ -163,14 +163,26 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         if specialist_agent:
             # --- PATH 1a: Yes, agent exists ---
             ctx.logger.info(f"Specialist agent found: {specialist_agent}")
+            specialist_agent = specialist_agent.strip()
+            repr(specialist_agent)
+            specialist_agent = specialist_agent.replace('"','')
             
             # [ACTION] Pass prompt to that agent
             ctx.logger.info(f"[ACTION] Forwarding prompt to specialist agent: {specialist_agent}")
             response_text = f"{prompt}"
-            await ctx.send(sender, create_text_chat(response_text))
-            
-            # Here we would normally wait for the response from the specialist agent and forward it back to the user
-            await ctx.send(sender, create_text_chat(f"Waiting for response from specialist agent: {specialist_agent}..."))
+            ctx.logger.info(f"[ACTION] Sending {prompt} to specialist agent: {specialist_agent}")
+            # await ctx.send(specialist_agent, create_text_hf_agent_chat(response_text, caller_agent_address=sender))
+            initial_message = HFManagerChat(
+                ChatMessage=ChatMessage(
+                    timestamp=datetime.utcnow(),
+                    msg_id=uuid4(),
+                    content=[TextContent(type="text", text=response_text)],
+                ),
+                caller_Agent_address=sender
+            )
+
+            await ctx.send(specialist_agent, initial_message)
+            ctx.logger.info(f"Prompt sent to specialist agent: {specialist_agent}")
 
         else:
             # --- PATH 1b: No, agent does not exist ---
