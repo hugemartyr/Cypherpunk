@@ -17,9 +17,9 @@ from uagents_core.contrib.protocols.chat import (
 )
 
 # === Configuration ===
-MODEL_ID = "gpt2"
+MODEL_ID = ""gpt2""
 TASK_TYPE = "auto"
-PORT = 8002
+PORT = 8001
 SEED_PHRASE = f"{MODEL_ID}_seed_phrase_12345"
 
 # --- Path Configuration ---

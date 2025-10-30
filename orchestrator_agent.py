@@ -26,7 +26,7 @@ from uagents_core.contrib.protocols.chat import (
 # Assuming knowledge_graph.py is in Implementation/meTTa/
 THRESHOLD_TO_DEPLOY_NEW_AGENT = 3
 
-from Implementation.meTTa.knowledge_graph import OrchestratorKnowledgeGraph, 
+from Implementation.meTTa.knowledge_graph import OrchestratorKnowledgeGraph
     
 
 

@@ -25,7 +25,7 @@ from uagents_core.contrib.protocols.chat import (
 # Import our MeTTa Knowledge Graph
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 3
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
 
 # --- Agent Configuration ---
 
@@ -40,14 +40,32 @@ logger = logging.getLogger("OrchestratorAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Initialize Agent and Knowledge Graph
-agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED,port=8001)
+# agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED,port=8001)
+AGENT_PORT = 5080
+agent = Agent(
+    name="hf_orchestrator_agent",
+    seed=AGENT_SEED,
+    port=AGENT_PORT,
+    endpoint=[f"http://localhost:{AGENT_PORT}/submit"] # Assuming local for now
+)
 kg = OrchestratorKnowledgeGraph()
 
-# --- Chat Protocol Setup (from your example) ---
 
+# --- Chat Protocol Setup (from your example) ---
+new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 
 hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
+
+class HFManagerChat(Model):
+    ChatMessage: ChatMessage
+    caller_Agent_address: str
+class HFManagerChatAcknowledgement(Model):
+    ChatAcknowledgement: ChatAcknowledgement
+    caller_Agent_address: str
+    
+
+
 def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
     """Helper function to create a text chat message."""
     content = [TextContent(type="text", text=text)]
@@ -57,6 +75,21 @@ def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
         timestamp=datetime.now(timezone.utc),
         msg_id=uuid4(),
         content=content,
+    )
+def create_text_hf_agent_chat(text: str, caller_agent_address: str, end_session: bool = False) -> HFManagerChat:
+    """
+    Helper function to create a text chat message for the HFManagerAgent.
+
+    """
+    content = [TextContent(type="text", text=text)]
+    
+    return HFManagerChat(
+        ChatMessage=ChatMessage(
+            timestamp=datetime.now(timezone.utc),
+            msg_id=uuid4(), 
+            content=content,
+        ),  
+        caller_Agent_address=caller_agent_address
     )
 
 # --- Agent's Core Logic ---
@@ -100,7 +133,6 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
         prompt = match.group(2).strip()
         return task, prompt
     return None, None
-
 
 
 async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):    
@@ -149,16 +181,35 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
             # [ACTION] Tell HF_agent (our local tool) to build and run the model
             ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{model_id}'...")
-            response_text = f"Generate a transient response using model '{model_id}' for prompt: '{prompt}' and give me the response."
-            await ctx.send(hf_manager_address, create_text_chat(response_text))
+            response_text = f"generate transient {model_id} '{prompt}'"
+            # await ctx.send(hf_manager_address, create_text_chat(response_text))
+            transient_command = f"<generate> transient {model_id} {prompt}"
+    
+            ctx.logger.info(f"Sending command: {transient_command}")
+            await ctx.send(
+                hf_manager_address, 
+                create_text_hf_agent_chat(
+                    text=transient_command, 
+                    caller_agent_address=sender
+                )
+            )
             
-
             # 5. Check if usage count meets the threshold to deploy
             if new_count >= THRESHOLD_TO_DEPLOY_NEW_AGENT:
                 ctx.logger.info(f"Usage threshold ({THRESHOLD_TO_DEPLOY_NEW_AGENT}) reached!")
                 
                 # [ACTION] Tell HF_agent (our deploy tool) to deploy this model
                 ctx.logger.info(f"[ACTION] Calling 'provisioner.py' to deploy new agent for '{model_id}'...")
+                persistent_command = f"<generate> persistent {model_id}"
+    
+                ctx.logger.info(f"Sending command: {persistent_command}")
+                await ctx.send(
+                    hf_manager_address, 
+                    create_text_hf_agent_chat(
+                        text=persistent_command, 
+                        caller_agent_address=sender
+                    )
+                )
                 
                 
                 # here we will recieve message from HF_agent about new deployed agent address
@@ -198,7 +249,6 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
 
 
-
 # --- Agent Message Handlers ---
 @chat_proto.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
@@ -208,12 +258,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
         sender,
         ChatAcknowledgement(timestamp=datetime.now(timezone.utc), acknowledged_msg_id=msg.msg_id),
     )
-    
-    if(sender == hf_manager_address):
-        ctx.logger.info(f"Received message from HF Manager: {sender}")
-        
-        return
-
     for item in msg.content:
         if isinstance(item, StartSessionContent):
             ctx.logger.info(f"Got a start session message from {sender}")
@@ -239,9 +283,38 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 async def handle_ack(ctx: Context, sender: str, msg: ChatAcknowledgement):
     """Handle chat acknowledgements."""
     ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.acknowledged_msg_id}")
+    
+
+    
+
+@new_chat_protocol.on_message(HFManagerChat)
+async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerChat):
+    """Handle chat messages from HF Manager agent."""
+    
+    pass
+    # just check if 
+    for item in msg.ChatMessage.content:
+        if isinstance(item, TextContent):
+            ctx.logger.info(f"Got message from HF Manager: {item.text}")
+            if(item.text=="Tool executed successfully."):
+                ctx.logger.info(f"Tool executed successfully.")
+                # send ack to caller agent
+                await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(type="text", text="Tool executed successfully.")]))
+                
+            else:
+                ctx.logger.info(f"Message from HF Manager: {item.text}")
+
+
+
+@new_chat_protocol.on_message(HFManagerChatAcknowledgement)
+async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
+    """Handle chat acknowledgements."""
+    ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.ChatAcknowledgement.acknowledged_msg_id}")
+
 
 # Register the protocol
 agent.include(chat_proto, publish_manifest=True)
+agent.include(new_chat_protocol, publish_manifest=True)
 
 
 fund_agent_if_low(agent.wallet.address())

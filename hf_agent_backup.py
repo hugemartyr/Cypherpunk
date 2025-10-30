@@ -1,249 +1,3 @@
-# import os
-# import sys
-# import subprocess
-# import json
-# from typing import Dict, Any
-# import time
-# import signal
-# import requests
-
-# from uagents import Agent, Protocol, Context, Model
-
-# #import the necessary components from the chat protocol
-# from uagents_core.contrib.protocols.chat import (
-#     ChatAcknowledgement,
-#     ChatMessage,
-#     TextContent,
-#     chat_protocol_spec,
-# )
-
-# # Define the directory for persistent models
-# MODELS_DIR = "Agent_Models"
-# API_KEY = os.getenv("ASI_ONE_API_KEY")
-# BASE_URL = "https://api.asi1.ai/v1/chat/completions"
-# MODEL = "asi1-mini"
-
-
-# from specialist_agent_runner_script import generate_persistent_runner_content
-# from transient_runner_script import generate_transient_runner_content
-
-# curr_port = 6001
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (unchanged)."""
-#     filename = "hf_transient_runner.py"
-#     try:
-#         with open(filename, "w", encoding="utf-8") as f:
-#             f.write(generate_transient_runner_content())
-
-#         command = [sys.executable, filename, model_id, prompt, task_type]
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if result.returncode != 0 or not stdout:
-#             return {"success": False, "error": stderr or "Unknown failure"}
-#         return json.loads(stdout)
-#     except Exception as e:
-#         return {"success": False, "error": str(e)}
-#     finally:
-#         if os.path.exists(filename):
-#             os.remove(filename)
-
-# def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path B: Persistent Run (using improved runner with embedded parameters)."""
-#     os.makedirs(MODELS_DIR, exist_ok=True)
-#     model_safe = model_id.replace("/", "__").replace("-", "_")
-#     model_safe += "_model"
-#     model_dir = os.path.join(MODELS_DIR, model_safe)
-#     os.makedirs(model_dir, exist_ok=True)
-
-#     runner_file = os.path.join(model_dir, "runner.py")
-#     log_file = os.path.join(model_dir, "log.txt")
-#     global curr_port
-#     curr_port += 1
-#     script_content = generate_persistent_runner_content(model_id, curr_port, task_type, log_file)
-
-#     # Write the runner script
-#     with open(runner_file, "w", encoding="utf-8") as f:
-#         f.write(script_content)
-
-#     # Clear previous logs if any
-#     if os.path.exists(log_file):
-#         os.remove(log_file)
-
-#     # command = [sys.executable, runner_file]
-#     # process = subprocess.Popen(command, cwd=model_dir, text=True)
-#     # time.sleep(5)
-
-#     return {
-#         "success": True,
-#         # "pid": process.pid,
-#         "runner": runner_file,
-#         "log": log_file,
-#         "status": f"Model {model_id} started in persistent mode with embedded parameters."
-#     }
-
-# run_transient_model_schema={
-#     "type": "object",
-#     "function": {
-#         "name": "run_transient_model",
-#         "description": "Run a HuggingFace model in transient mode (single-use).",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "model_id": {
-#                     "type": "string",
-#                     "description": "The HuggingFace model ID (e.g., 'gpt2', 'facebook/bart-large-cnn')."
-#                 },
-#                 "prompt": {
-#                     "type": "string",
-#                     "description": "The input prompt or text for the model."
-#                 },
-#                 "task_type": {
-#                     "type": "string",
-#                     "description": "The task type for the model (e.g., 'text-generation', 'summarization', 'translation'). Use 'auto' to infer.",
-#                     "default": "auto"
-#                 }
-#             },
-#             "required": ["model_id", "prompt"],
-#             "additionalProperties": False
-#         }
-#     }
-# }
-
-# run_persistent_model_schema={
-#     "type": "object",
-#     "function": {
-#         "name": "run_persistent_model",
-#         "description": "Run a HuggingFace model in persistent mode (long-running).",
-#         "parameters": {
-#             "type": "object",
-#             "properties": {
-#                 "model_id": {
-#                     "type": "string",
-#                     "description": "The HuggingFace model ID (e.g., 'gpt2', 'facebook/bart-large-cnn')."
-#                 },
-#                 "task_type": {
-#                     "type": "string",
-#                     "description": "The task type for the model (e.g., 'text-generation', 'summarization', 'translation'). Use 'auto' to infer.",
-#                     "default": "auto"
-#                 }
-#             },
-#             "required": ["model_id"],
-#             "additionalProperties": False
-#         }
-#     }
-# }
-# # -----------------------------------------
-# # --- Main Interface ---
-# # -----------------------------------------
-
-
-# # Intialise agent1
-# agent = Agent(
-#     name="HF_MANAGEMENT_AGENT",
-#     port=5060,
-#     endpoint=["http://localhost:5060/submit"],
-# )
-
-# # Initialize the chat protocol
-# chat_proto = Protocol(spec=chat_protocol_spec)
-# agent.include(chat_proto, publish_manifest=True)
-
-
-
-# messages =[
-#     {"role": "user", "content": "This is the HuggingFace Model Management Agent. It can run HuggingFace models in transient or persistent modes,If you think the request is persistent use run_persistent_model or use run_transient_model if you think there will only be one request. Use the available tools to run models as needed."}
-# ]
-
-# @agent.on_event('startup')
-# async def startup_handler(ctx : Context):
-#     ctx.logger.info(f' My name is {ctx.agent.name} and my address  is {ctx.agent.address}')
-    
-# # Message Handler - Process received messages and send acknowledgements
-# @chat_proto.on_message(ChatMessage)
-# async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-#     for item in msg.content:
-#         if isinstance(item, TextContent):
-#             # Log received message
-#             ctx.logger.info(f"Received message from {sender}: {item.text}")
-            
-#             # Send acknowledgment
-#             ack = ChatAcknowledgement(
-#                 timestamp=datetime.utcnow(),
-#                 acknowledged_msg_id=msg.msg_id
-#             )
-#             await ctx.send(sender, ack)
-            
-            
-#             # process request 
-#             resp = requests.post(
-#                 BASE_URL,
-#                 headers={"Authorization": f"Bearer {API_KEY}", "Content-Type": "application/json"},
-#                 json={"model": MODEL, "messages": messages, "tools": [run_transient_model_schema, run_persistent_model_schema]},
-#             ).json()
-
-
-#             choice = resp["choices"][0]["message"]
-#             if "tool_calls" not in choice:
-#                 print("Model replied normally:", choice["content"])
-#                 exit()
-
-#             tool_call = choice["tool_calls"][0]
-#             print("Tool-call from model:", json.dumps(tool_call, indent=2))
-#             # Extract arguments
-#             arg_str = tool_call.get("arguments") or tool_call.get("function", {}).get("arguments")
-#             args = json.loads(arg_str)
-#             print("Parsed arguments:", args)
-            
-#             if tool_call["name"] == "run_transient_model":
-#                 result = run_transient_model(**args)
-#             elif tool_call["name"] == "run_persistent_model":
-#                 result = run_persistent_model(**args)
-#             else:
-#                 result = {"success": False, "error": "Unknown tool called."}
-#             print(f"Backend tool result: {json.dumps(result, indent=2)}")
-            
-#             # # Send response message
-#             # response = ChatMessage(
-#             #     timestamp=datetime.utcnow(),
-#             #     msg_id=uuid4(),
-#             #     content=[TextContent(type="text", text="Hello from Agent1!")]
-#             # )
-#             # await ctx.send(sender, response)
-
-# # Acknowledgement Handler - Process received acknowledgements
-# @chat_proto.on_message(ChatAcknowledgement)
-# async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
-#     ctx.logger.info(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
-    
-        
-# def main():
-#     print("=" * 80)
-#     print("HuggingFace Model Orchestrator")
-#     print("=" * 80)
-#     print("1. Path A: Transient Run")
-#     print("2. Path B: Persistent Run")
-#     choice = input("Enter choice (1 or 2): ").strip()
-
-#     model_id = input("Model ID: ").strip()
-    
-#     task_type = input("Task Type (press Enter for auto): ").strip() or "auto"
-
-#     if choice == "1":
-#         prompt = input("Prompt: ").strip()
-#         res = run_transient_model(model_id, prompt, task_type)
-#         print(json.dumps(res, indent=2))
-#     elif choice == "2":
-#         res = run_persistent_model(model_id, task_type)
-#         print(json.dumps(res, indent=2))
-#     else:
-#         print("Invalid choice.")
-
-# if __name__ == "__main__":
-#     main()
-
-
 import os
 import sys
 import subprocess
@@ -304,101 +58,6 @@ curr_port = AGENT_PORT + 1 # Start ports for specialists after the manager's por
 
 from specialist_agent_runner_script import generate_persistent_runner_content
 from transient_runner_script import generate_transient_runner_content
-
-
-
-class HFManagerChat(Model):
-    ChatMessage: ChatMessage
-    caller_Agent_address: str
-
-class HFManagerChatAcknowledgement(Model):
-    ChatAcknowledgement: ChatAcknowledgement
-    caller_Agent_address: str
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (unchanged)."""
-#     filename = "hf_transient_runner.py"
-#     try:
-#         with open(filename, "w", encoding="utf-8") as f:
-#             f.write(generate_transient_runner_content())
-
-#         command = [sys.executable, filename, model_id, prompt, task_type]
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if result.returncode != 0 or not stdout:
-#             return {"success": False, "error": stderr or "Unknown failure"}
-#         return json.loads(stdout)
-#     except Exception as e:
-#         return {"success": False, "error": str(e)}
-#     finally:
-#         if os.path.exists(filename):
-#             os.remove(filename)
-
-# def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
-#     """Executes Path A: Transient Run (single-use inference)."""
-#     model_id.replace('"', '') # Sanitize input
-#     repr(model_id)
-#     model_id="'"+model_id+"'"
-#     repr(prompt)
-    
-#     print(f"[DEBUG] Running transient model: {model_id} with prompt: {prompt} and task_type: {task_type}")
-#     filename = f"hf_transient_runner_{uuid4()}.py" # Unique filename
-#     runner_path = os.path.join(SCRIPT_DIR, filename) # Place in script dir
-#     logger.info(f"Starting transient run for {model_id} with script {filename}")
-#     try:
-#         # Generate the runner script content
-#         script_content = generate_transient_runner_content(model_id, prompt, task_type)
-#         if not script_content:
-#              raise ValueError("Failed to generate transient runner script content.")
-
-#         with open(runner_path, "w", encoding="utf-8") as f:
-#             f.write(script_content)
-
-#         # Ensure the script uses the correct Python executable (from the current venv)
-#         python_executable = sys.executable
-#         command = [python_executable, runner_path]
-
-#         # Increased timeout for model download/run
-#         result = subprocess.run(command, capture_output=True, text=True, timeout=900) # 15 min timeout
-        
-        
-#         stdout, stderr = result.stdout.strip(), result.stderr.strip()
-
-#         if stderr:
-#             logger.warning(f"Transient runner STDERR for {model_id}:\n{stderr}")
-
-#         if result.returncode != 0 or not stdout:
-#             error_message = stderr or f"Unknown failure (return code {result.returncode})"
-#             logger.error(f"Transient run failed for {model_id}: {error_message}")
-#             return {"status": "error", "message": error_message}
-
-#         logger.info(f"Transient run successful for {model_id}. Output length: {len(stdout)}")
-#         # Attempt to parse JSON output
-#         try:
-#             output_json = json.loads(stdout)
-#             # Ensure status is success if parsing works
-#             if isinstance(output_json, dict) and "status" not in output_json:
-#                  output_json["status"] = "success"
-#             return output_json
-#         except json.JSONDecodeError:
-#             logger.warning(f"Transient runner output for {model_id} was not valid JSON. Returning raw output.")
-#             return {"status": "success", "output": stdout} # Return raw output if not JSON
-
-#     except subprocess.TimeoutExpired:
-#         logger.error(f"Transient run timed out for {model_id}")
-#         return {"status": "error", "message": "Process timed out after 15 minutes."}
-#     except Exception as e:
-#         logger.error(f"Error during transient run for {model_id}: {e}", exc_info=True)
-#         return {"status": "error", "message": str(e)}
-#     finally:
-#         # Cleanup the temporary script
-#         if os.path.exists(runner_path):
-#             try:
-#                 os.remove(runner_path)
-#                 logger.debug(f"Cleaned up transient script: {filename}")
-#             except OSError as e:
-#                 logger.warning(f"Could not remove transient script {filename}: {e}")
 
 
 def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
@@ -644,7 +303,6 @@ agent = Agent(
     port=AGENT_PORT,
     endpoint=[f"http://localhost:{AGENT_PORT}/submit"], # Manager agent endpoint
 )
-new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 conversations: Dict[str, List[Dict[str, Any]]] = {}
 
@@ -655,7 +313,6 @@ async def startup_handler(ctx: Context):
     ctx.logger.info(f'My name is {ctx.agent.name} and my address is {ctx.agent.address}')
     ctx.logger.info(f'Agent running on http://localhost:{AGENT_PORT}')
 
-# handle chat from normal User
 @chat_proto.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     session_id = sender # Use sender address as session identifier
@@ -786,113 +443,40 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     conversations.pop(session_id, None)
 
 
-    
-    
-    
-@chat_proto.on_message(ChatAcknowledgement)
-async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
-    ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
-    
+class HFManagerChat(Model):
+    ChatMessage: ChatMessage
+    caller_Agent_address: str
 
-    
-    
+
 # handle messages from ORC agent
-# --- Corrected Message Handlers ---
-
-@new_chat_protocol.on_message(HFManagerChat)
+@chat_proto.on_message(HFManagerChat)
 async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManagerChat):
+    session_id = sender 
 
-    print(f"[DEBUG] Handling message from ORC agent: {msg}")
+    # Initialize conversation history if it's a new session
+    if session_id not in conversations:
+        logger.info(f"New conversation started with {sender}")
+        conversations[session_id] = [
+            {"role": "system", "content": "You are the HuggingFace Model Management Agent. Decide whether to run models transiently (single-use) or persistently (long-running) based on the user request. Use the available tools: `run_transient_model` for one-off tasks, and `run_persistent_model` to start a model agent if persistence seems needed. Always report the outcome of the tool call back to the user."}
+        ]
 
-    # 1. Get the command text
-    try:
-        # Assuming the command is in the first content block
-        command_text = msg.ChatMessage.content[0].text.strip()
-        logger.info(f"Received command from {sender}: {command_text}")
-    except (IndexError, AttributeError):
-        error_msg = "Error: Received message with invalid or empty content."
-        logger.error(error_msg)
-        await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=error_msg)]))
-        await ctx.send(sender, HFManagerChat(ChatMessage(content=[TextContent(text=error_msg)]), caller_Agent_address=msg.caller_Agent_address))
-        return
-
-    # 2. Parse the command
-    if not command_text.startswith("<generate>"):
-        error_msg = "Error: Command must start with <generate>."
-        logger.warning(f"Invalid command from {sender}: {command_text}")
-        await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=error_msg)]))
-        await ctx.send(sender, HFManagerChat(ChatMessage(content=[TextContent(text=error_msg)]), caller_Agent_address=msg.caller_Agent_address))
-        return
-
-    # Split: <generate> <type> <model_id> <prompt/task>
-    parts = command_text.split(maxsplit=3)
-    
-    tool_result = None
-    error_msg = None
-    
-    print(f"[DEBUG] Command parts: {parts}")
-
-    # 3. Execute the correct tool
-    try:
-        if len(parts) < 3:
-            error_msg = "Error: Invalid command. Expected: <generate> <type> <model_id> [prompt]"
-        else:
-            tool_type = parts[1].lower()
-            model_id = parts[2]
-
-            if tool_type == "transient":
-                if len(parts) == 4:
-                    prompt = parts[3]
-                    tool_result =  run_transient_model(model_id=model_id, prompt=prompt)
-                else:
-                    error_msg = "Error: 'transient' tool requires a prompt. Expected: <generate> transient <model_id> <prompt>"
-                    
-                    
-            
-            elif tool_type == "persistent":
-                # Note: This ignores parts[3] (the prompt) if provided,
-                # as the persistent tool doesn't take one.
-                tool_result =  run_persistent_model(model_id=model_id)
-                
-            else:
-                error_msg = f"Error: Unknown tool type '{tool_type}'. Must be 'transient' or 'persistent'."
-
-    except Exception as e:
-        logger.error(f"Error during tool execution for {sender}: {e}")
-        error_msg = f"Error: Tool execution failed. {e}"
-
-    # 4. Formulate and send the response
-    if tool_result:
-        response_text = f"Tool executed successfully. Result: {tool_result.get('output', 'No result string.')}"
-    else:
-        response_text = error_msg or "Error: An unknown error occurred."
-
-    if tool_type == "transient":
-        # Send response directly to the original caller
-        logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
-        await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=response_text)]))
-    
-    # Send confirmation/result back to the ORC agent
-    # logger.info(f"Sending response to ORC agent {sender}: {response_text}")
-    # await ctx.send(sender, HFManagerChat(ChatMessage=ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
-
-    # The 'conversations' dictionary and cleanup are no longer needed for this logic.
+    # Process incoming text content
+    # just call tool based on prompt like 
+    #<generate>
 
     
     
     # Clean up history for the session
-    # conversations.pop(session_id, None)
+    conversations.pop(session_id, None)
 
 
-@new_chat_protocol.on_message(HFManagerChatAcknowledgement)
-async def handle_acknowledgement_of_Manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
-    ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.ChatAcknowledgement.acknowledged_msg_id}")
 
-    
+@chat_proto.on_message(ChatAcknowledgement)
+async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
+    ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
 
 
 agent.include(chat_proto, publish_manifest=True)
-agent.include(new_chat_protocol, publish_manifest=True)
 
 if __name__ == "__main__":
     logger.info(f"Starting HF Manager Agent on port {AGENT_PORT}...")
