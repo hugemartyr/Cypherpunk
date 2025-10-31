@@ -2,7 +2,7 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-import threading
+# import threading
 from uuid import uuid4
 from uagents import Agent, Context, Model, Protocol
 from uagents.setup import fund_agent_if_low
@@ -31,7 +31,10 @@ from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
 # --- Agent Configuration ---
 THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_5"
+hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3" ### Change accordingly
+
+
+AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_6"
 API_KEY = os.getenv("ASI_ONE_API_KEY")
 print(f"Using ASI-1 API Key: {API_KEY is not None}")
 BASE_URL = "https://api.asi1.ai/v1/chat/completions"
@@ -50,21 +53,17 @@ agent = Agent(
     name="hf_orchestrator_agent",
     seed=AGENT_SEED,
     port=AGENT_PORT,
-    endpoint=[f"http://localhost:{AGENT_PORT}/submit"], # Assuming local for now,
-    mailbox=True
+    endpoint=[f"http://localhost:{AGENT_PORT}/submit"],
+    # mailbox=True
     
 )
 kg = OrchestratorKnowledgeGraph()
 
 
+
 # --- Chat Protocol Setup (from your example) ---
 new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
-
-
-
-hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
-### Change accordingly
 
 
 
@@ -111,8 +110,6 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
     # pass query to llm to parse it better
     # """
     
-    # match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
-    
     # messages=[
     #     {"role": "system", "content": "You are an expert at parsing user queries into structured tasks and prompts."},
     #     {"role": "user", "content": f"Parse the following user query into a task and prompt: '{user_query}'.\n"
@@ -137,6 +134,10 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
     #     logger.error(f"Failed to parse user query: {task_prompt_response.text}")
     #     return None, None
     
+    """
+    Simple regex-based parser as a fallback to generate consistent task and prompt.
+    You uncomment the LLM-based parsing above to use a more sophisticated approach.
+    """
     # generate using regex for now
     match = re.match(r"generate\s+([^\s]+)\s+(.+)", user_query, re.IGNORECASE)
     if match:
@@ -237,24 +238,46 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
     
     else:
-        # --- PATH 2: No, I don't have knowledge ---
-        ctx.logger.info(f"No knowledge found for new task: '{task}'")
         
-        # [ACTION] Search Hugging Face Hub for the best model for this task
-        ctx.logger.info(f"[ACTION] Searching Hugging Face Hub for '{task}'...")
-        
-    
-        # Simulate finding a new model
-        simulated_new_model = f"hf-hub/new-model-for-{task}"
-        ctx.logger.info(f"Found new model: {simulated_new_model}")
-        
-        # Add this new knowledge to MeTTa and set its count to 1
-        kg.add_new_task_model(task, simulated_new_model)
-        ctx.logger.info(f"New task and model added to MeTTa. Initial count set to 1.")
-        
-        # [ACTION] Call the local HF_agent to run this new model
-        ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{simulated_new_model}'...")
-        response_text = f"Found new model '{simulated_new_model}' on HF Hub. [Simulating call: Running model locally...]"
+        # --- Step 1: Query Agentverse for related models ---
+        try:
+            # search agentverse for related models
+            search_query = task or "general AI"  # fallback if task is empty
+            response = requests.post(
+                "https://agentverse.ai/v1/search/agents",
+                headers={"Content-Type": "application/json"},
+                json={"search_text": search_query},
+                timeout=10
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                agents = data.get("agents", []) or data.get("results", [])
+                if agents:
+                    # Take top 5–6 models
+                    top_agents = agents[:6]
+                    suggestions = "\n".join(
+                        [f"- {a.get('name', 'Unknown')} ({a.get('address', 'N/A')})" for a in top_agents]
+                    )
+                    response_text = (
+                        f"No existing MeTTa model found for task '{task}'.\n"
+                        f"Here are some related models found on Agentverse:\n\n{suggestions}"
+                    )
+                else:
+                    response_text = (
+                        f"No existing MeTTa model found for task '{task}', "
+                        "and no similar agents found on Agentverse."
+                    )
+            else:
+                response_text = (
+                    f"Failed to query Agentverse (HTTP {response.status_code}). "
+                    f"Simulating a fallback model for '{task}'."
+                )
+        except Exception as e:
+            ctx.logger.error(f"Agentverse search failed: {e}")
+            response_text = f"Could not reach Agentverse. Simulating new model for '{task}'."
+
+        # --- Step 3: Respond to user ---
         await ctx.send(sender, create_text_chat(response_text))
 
 
@@ -411,7 +434,6 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
     """Handle chat messages from HF Manager agent."""
     
     pass
-    # just check if 
     for item in msg.ChatMessage.content:
         if isinstance(item, TextContent):
             ctx.logger.info(f"Got message from HF Manager: {item.text}")
@@ -423,8 +445,10 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
             if("Hugging Face Persistent Model Agent started at address:" in item.text):
                 
                 ctx.logger.info(f"Message from HF Manager: {item.text}")
+                
                 # Extract the address from the message
                 match = re.search(r"Hugging Face Persistent Model Agent started at address: (\S+) for model (\S+)", item.text)
+                
                 if match:
                     new_agent_address = match.group(1)
                     model_id = match.group(2)

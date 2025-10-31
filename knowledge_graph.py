@@ -45,6 +45,9 @@ class OrchestratorKnowledgeGraph:
             '(= (model-for-task "image-generation" "default") "segmind/tiny-sd")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
+            '(= (model-for-task "image-generation" "default") "segmind/tiny-sd2")'
+        ))
+        self.metta.space().add_atom(self.metta.parse_single(
             '(= (model-for-task "image-generation" "fast") "segmind/tiny-sd")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
@@ -70,6 +73,9 @@ class OrchestratorKnowledgeGraph:
             '(= (usage-count "segmind/tiny-sd") 0)'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
+            '(= (usage-count "segmind/tiny-sd2") 2)'
+        ))
+        self.metta.space().add_atom(self.metta.parse_single(
             '(= (usage-count "stabilityai/sdxl-turbo") 0)'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
@@ -91,13 +97,38 @@ class OrchestratorKnowledgeGraph:
         ))
         logger.info("Knowledge graph initialized.")
 
+    def get_usage_count(self, model_id: str) -> int:
+        """Gets the current usage count for a model ID."""
+        # --- FIX: Use !(match &self ...) to query the space ---
+        model_id = model_id.replace('"', '')
+        query = f'!(match &self (= (usage-count "{model_id}") $count) $count)'
+        result = self.metta.run(query)
+        print(f"[DEBUG] get_usage_count('{model_id}') result: {result}")
+        if result and result[0]:
+            # The result is a ValueAtom, so we get its value
+            return int(result[0][0].get_object().value)
+        return 0 # Default to 0 if no atom exists
+
+    
     def find_model_for_task(self, task: str, tag: str = "default") -> str | None:
         """Finds the best model ID for a given task and tag."""
-  
         query = f'!(match &self (= (model-for-task "{task}" "{tag}") $model_id) $model_id)'
         result = self.metta.run(query)
-        if result and result[0]:
-            return str(result[0][0])
+        
+        #sort based on usage count
+        print(f"[DEBUG] find_model_for_task('{task}', '{tag}') result: {result}")
+        final_sorted_result = []
+        for i in range(len(result[0])):
+            model_id = str(result[0][i])
+            usage_count = self.get_usage_count(model_id)
+            final_sorted_result.append((model_id, usage_count))
+
+        # Sort the final result by usage count (highest first)
+        final_sorted_result.sort(key=lambda x: x[1], reverse=True)
+        print(f"[DEBUG] find_model_for_task('{task}', '{tag}') final sorted result: {final_sorted_result}")
+
+        if final_sorted_result:
+            return final_sorted_result[0][0]
         return None
 
     def find_specialist_agent(self, model_id: str) -> str | None:
@@ -108,19 +139,10 @@ class OrchestratorKnowledgeGraph:
         result = self.metta.run(query)
         print(f"[DEBUG] find_specialist_agent('{model_id}') result: {result}")
         if result and result[0]:
-            return str(result[0][0])
+            return str(result[0][-1])
         return None
 
-    def get_usage_count(self, model_id: str) -> int:
-        """Gets the current usage count for a model ID."""
-        # --- FIX: Use !(match &self ...) to query the space ---
-        query = f'!(match &self (= (usage-count "{model_id}") $count) $count)'
-        result = self.metta.run(query)
-        print(f"[DEBUG] get_usage_count('{model_id}') result: {result}")
-        if result and result[0]:
-            # The result is a ValueAtom, so we get its value
-            return int(result[0][0].get_object().value)
-        return 0 # Default to 0 if no atom exists
+
 
     def increment_usage_count(self, model_id: str) -> int:
         """
@@ -196,8 +218,8 @@ if __name__ == "__main__":
     print_all_atoms(kg.metta)
 
     # # 2. Test: Find model for a known task
-    # print("\n--- 2. TEST: Find model for 'text-generation' ---")
-    # model_id = kg.find_model_for_task("text-generation")
+    # print("\n--- 2. TEST: Find model for 'image-generation' ---")
+    # model_id = kg.find_model_for_task("image-generation")
     # print(f"Found model: {model_id}")
 
     # # 3. Test: Find a specialist agent that *doesn't* exist

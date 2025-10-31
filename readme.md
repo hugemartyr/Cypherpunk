@@ -6,7 +6,7 @@
 
 ## Overview
 
-**Cerebrum** is a unified **superintelligent orchestration layer** that bridges all AI models under one system.  
+**Cerebrum** is a unified **superintelligent orchestration layer** that bridges all AI models under one system.
 It uses the **ASI:One** agent to analyze prompts, select the optimal model, and decide between two workflows:
 
 - **Transient Execution** → One-time prompt runs that self-clean after execution.
@@ -16,47 +16,81 @@ Cerebrum integrates **Hugging Face models** with a **knowledge graph (MeTTa)** a
 
 ---
 
+## Explaining the Idea with an Example
+
+Suppose we don't have any agent capable of generating sound but we have a sound generation model on Hugging Face (HF).
+
+Now suppose a user on Agentverse says: "Generate me sound of old class rocking music"
+There is no model in Agentverse good enough to do this, but there is a model on HF to do exactly this. We bridge the gap between Agentverse and HF.
+
+By querying the orchestrator agent, it sees there is a new type of task: sound generation. It keeps the task in mind and finds models from HF. It gets the model ID `facebook-medium` from HF. It will then tell the `HF_agent` to temporarily make a `facebook-medium` model, generate the inference, and return it to the original caller user.
+
+Now, suppose many users are generating sounds from `facebook-medium`. It would be better if an agent exists in Agentverse that has the capability of generating sound. The orchestrator agent, on seeing high demand, will command the `HF_agent` to deploy an agent with sound generation capability.
+
+Currently, we haven't done this for image/sound generation; we have made the workflow for textual messages.
+
+Also, if you know a `model_id`, you can directly query the `HF_agent` to make your model rather than going through the orchestrator path (That is why we have 2 agents).
+
+Agents are created on demand basis
+
+### Now Users Can Query in Agentverse
+
+> Hey i wanna _test_ MiniMaxAI/MiniMax-M2 hugging face model for my work, can you generate text about Ai Agents and blockchains from MiniMaxAI/MiniMax-M2 hugging face models
+
+> Hey can you make me an agent with text generation capability from hugging face model id : MiniMaxAI/MiniMax-M2
+
+> Hey can generate me text about Fetch Ai from _best_ hugging face models
+
 ## Execution Flow
 
-### Step 1: Start the Hugging Face Agent
+You can run `./run_instructions` to install required libraries or follow the instructions below.
 
-Run the **hf_agent.py** file first.  
-This initializes the agent responsible for model execution and provides its agent address.
+### Print Instructions
 
-```bash
-python3 hf_agent.py
 ```
-
-Copy the displayed **agent address** — you’ll need this for the next step.
+=========================================
+Project Run Instructions
+=========================================
+You need 3 terminals to run this project:
 
 ---
-
-### Step 2: Start the Orchestrator Agent
-
-Next, run the **orchestrator_agent.py** and pass it the address of the HF Agent.  
-This is the central brain that decides which model to use and how (persistent or transient).
-
-```bash
-python3 orchestrator_agent.py
-```
-
-Copy the orchestrator’s **agent address** for use in the next step.
-
+Terminal 1: HF Manager Agent
 ---
 
-### Step 3: Run the Message Sender Agent
-
-Open **simple_agent_to_send_message.py**, paste the **orchestrator address** in the designated place, and modify the prompt you want to send.
-
-Then run:
-
-```bash
-python3 simple_agent_to_send_message.py
-```
-
-This script sends your request to the orchestrator, which interprets the prompt, retrieves required model parameters (model ID, task type, etc.) from the **knowledge graph**, and communicates with the **hf_agent** to execute the model.
+1. Run the HF Manager Agent:
+   python3 hf_agent.py
+2. Copy the agent address that is printed (e.g., agent1q...).
 
 ---
+Terminal 2: Orchestrator Agent
+---
+3. Open orchestrator_agent.py in your editor.
+4. Paste the HF Manager's address into the 'hf_manager_address' variable.
+5. Run the Orchestrator Agent:
+   python3.12 orchestrator_agent.py
+
+---
+Terminal 3: Client Agent (Choose one path)
+---
+You can now test any of the following paths:
+
+Path 1: Test Transient Model (Directly)
+- Edit 'simple_agent_to_send_message_hf_transient.py' to set the HF agent address and prompt.
+- Run: python3 simple_agent_to_send_message_hf_transient.py
+
+Path 2: Test Persistent Model (Directly)
+- Edit 'simple_agent_to_send_message_hf_persistent.py' to set the HF agent address and prompt.
+- Run: python3 simple_agent_to_send_message_hf_persistent.py
+
+Path 3: Test Orchestrator (Knowledge Graph)
+- Edit 'simple_agent_to_send_message_orc_agent.py' to set the ORC agent address.
+- Run: python3 simple_agent_to_send_message_orc_agent.py
+
+Path 4: Test Orchestrator (Auto-Deployment)
+- Set THRESHOLD_TO_DEPLOY_NEW_AGENT = 2 in the orchestrator_agent.py config.
+- Run the command from Path 3 twice.
+- This will trigger the deployment of a new agent.
+```
 
 ## Behind the Scenes
 
@@ -75,12 +109,11 @@ The **HF Agent** executes the selected model, retrieves the output, and sends it
 
 ## Run Summary
 
-| Step | File                              | Description                        |
-| ---- | --------------------------------- | ---------------------------------- |
-| 1    | `hf_agent.py`                     | Initializes model execution agent  |
-| 2    | `orchestrator_agent.py`           | Runs ASI:One orchestrator          |
-| 3    | `simple_agent_to_send_message.py` | Sends user prompts to orchestrator |
-| -    | `knowledge_graph.py`              | Supports orchestration logic       |
+| Step | File                    | Description                       |
+| :--- | :---------------------- | :-------------------------------- |
+| 1    | `hf_agent.py`           | Initializes model execution agent |
+| 2    | `orchestrator_agent.py` | Runs ASI:One orchestrator         |
+| -    | `knowledge_graph.py`    | Supports orchestration logic      |
 
 ---
 
