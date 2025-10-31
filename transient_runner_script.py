@@ -1,9 +1,3 @@
-import sys
-import json
-from transformers import pipeline
-import torch
-import warnings
-# We need repr for safe string formatting
 from reprlib import repr as safe_repr
 
 def generate_transient_runner_content(model_id: str, prompt: str, task_type: str) -> str:

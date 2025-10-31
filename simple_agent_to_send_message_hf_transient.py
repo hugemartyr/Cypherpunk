@@ -13,16 +13,15 @@ from uagents_core.contrib.protocols.chat import (
 
 # Intialise agent1
 agent1 = Agent(
-    name="Agent1",
+    name="Simple Agent to Test HF Agent",
     port=5060,
     endpoint=["http://localhost:5060/submit"],
 )
 
-# Store agent2's address (you'll need to replace this with actual address)
-# agent2_address = "agent1qt5n8ma2g8hc5mcj0ne6hlnx8e8k9xnh9mmxa3jfa9kkgcwqpwlwxd2tddu"
-# agent2_address = "agent1q0g5qx5cx0jzqvjjn3lpsdzcyvp8m2smkekh8stqeke5uax770k8cdtngc9"
-# agent2_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
-agent2_address = "agent1qgl8etxfyrhrdqasrukt6xm23gs9lde2dsdy5zrft59tphf4592m5p082ut"
+
+agent_address_to_send_message = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
+
+prompt= "generate transient text-summarization history of agentic AI in brief using gpt2 model from hugging face, use necessary tools, just use tool and don't suggest any other logic"
 
 
 
@@ -40,10 +39,10 @@ async def startup_handler(ctx: Context):
     initial_message = ChatMessage(
         timestamp=datetime.utcnow(),
         msg_id=uuid4(),
-        content=[TextContent(type="text", text="generate text-summarization history of artificial intelligence in brief using the best hugging face models, use necessary tools and follow main_orchestrator logic")],
+        content=[TextContent(type="text", text=prompt)],
     )
     
-    await ctx.send(agent2_address, initial_message)
+    await ctx.send(agent_address_to_send_message, initial_message)
 
 # Message Handler - Process received messages and send acknowledgements
 @chat_proto.on_message(ChatMessage)
@@ -60,25 +59,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
             )
             await ctx.send(sender, ack)
             
-            
-            
-            # # Send response message
-            # response = ChatMessage(
-            #     timestamp=datetime.utcnow(),
-            #     msg_id=uuid4(),
-            #     content=[TextContent(type="text", text="Hello from Agent1!")]
-            # )
-            # await ctx.send(sender, response)
 
 # Acknowledgement Handler - Process received acknowledgements
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.info(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
 
-
-
-# Include the protocol in the agent to enable the chat functionality
-# This allows the agent to send/receive messages and handle acknowledgements using the chat protocol
 agent1.include(chat_proto, publish_manifest=True)
 
 if __name__ == '__main__':

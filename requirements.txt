@@ -1,0 +1,6 @@
+uagents
+requests
+python-dotenv
+psutil
+torch
+transformers

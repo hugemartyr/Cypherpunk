@@ -84,11 +84,8 @@ class OrchestratorKnowledgeGraph:
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (usage-count "crypto-news-model-id") 0)' # Added this for the crypto agent
         ))
-        
-        # --- 3. Model -> Specialist Agent ---
+        # --- 3. Model -> Specialist Agent Mapping ---
         # Format: (= (specialist-agent "model_id") "agent_address")
-        
-        # Fixed typo from your example ("crypt-" -> "crypto-")
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (specialist-agent "crypto-news-model-id") "agent1qfyxlj9lekd4x7yzuyvka5953gcwsataynakphqaf338lmw2u273xhftzyn")'
         ))
@@ -99,20 +96,12 @@ class OrchestratorKnowledgeGraph:
   
         query = f'!(match &self (= (model-for-task "{task}" "{tag}") $model_id) $model_id)'
         result = self.metta.run(query)
-        
-        # print(f"[DEBUG] find_model_for_task('{task}', '{tag}') result: {result}")
         if result and result[0]:
-            # result is like [['"segmind/tiny-sd"']]
-            # We take the first result, first element, and convert from Symbol Atom to string
             return str(result[0][0])
         return None
 
     def find_specialist_agent(self, model_id: str) -> str | None:
         """Finds the address of a specialist agent for a given model ID."""
-        
-    
-        #if(model_id=="<model>"): convert to <model>
-        # remove ""
         model_id = model_id.replace('"', '')
 
         query = f'!(match &self (= (specialist-agent "{model_id}") $agent_addr) $agent_addr)'
@@ -140,17 +129,13 @@ class OrchestratorKnowledgeGraph:
         """
         #remove ""
         model_id = model_id.replace('"', '')
-        # This function will now work because get_usage_count is fixed
         current_count = self.get_usage_count(model_id)
         new_count = current_count + 1
         
-        # 1. Create atoms for the old and new states
         old_atom = self.metta.parse_single(f'(= (usage-count "{model_id}") {current_count})')
         new_atom = self.metta.parse_single(f'(= (usage-count "{model_id}") {new_count})')
-        
         # print(f"[DEBUG] increment_usage_count('{model_id}'): {current_count} -> {new_count}")
         
-        # 2. Perform the update
         if self.metta.space().remove_atom(old_atom):
             self.metta.space().add_atom(new_atom)
         else:
@@ -173,11 +158,8 @@ class OrchestratorKnowledgeGraph:
         This is for the "No i don't have knowledge" case.
         """
         logger.info(f"Adding new task '{task}' with model '{model_id}'")
-        # 1. Add the task-to-model mapping
         model_atom = self.metta.parse_single(f'(= (model-for-task "{task}" "{tag}") "{model_id}")')
         self.metta.space().add_atom(model_atom)
-        
-        # 2. Initialize its usage count to 1 (since it's being used right now)
         count_atom = self.metta.parse_single(f'(= (usage-count "{model_id}") 1)')
         self.metta.space().add_atom(count_atom)
         
@@ -192,7 +174,6 @@ class OrchestratorKnowledgeGraph:
     
     def get_all_specialist_agents(self):
         """Returns a list of all registered specialist agents."""
-    
         # query = '!(match &self (= (specialist-agent $model_id) $agent_addr) $model_id $agent_addr)'
         # result = self.metta.run(query)
         # print(f"[DEBUG] get_all_specialist_agents() raw result: {result}")
@@ -256,18 +237,18 @@ if __name__ == "__main__":
     # count = kg.get_usage_count("facebook/musicgen-small") # Use the model_id directly
     # print(f"Initial count: {count}")
     
-    # 8. Test: Register another new agent for model id
-    print("\n--- 8. TEST: Register new specialist for 'crypto-news' ---")
-    tasks=kg.register_specialist_agent("new-model-id", "agent1q...newly-deployed-crypto-news...")
-    print(f"Registered new specialist agent for 'crypto-news': {tasks}")
-    agent = kg.find_specialist_agent("new-model-id")
-    print(f"Found new agent: {agent}")
+    # # 8. Test: Register another new agent for model id
+    # print("\n--- 8. TEST: Register new specialist for 'crypto-news' ---")
+    # tasks=kg.register_specialist_agent("new-model-id", "agent1q...newly-deployed-crypto-news...")
+    # print(f"Registered new specialist agent for 'crypto-news': {tasks}")
+    # agent = kg.find_specialist_agent("new-model-id")
+    # print(f"Found new agent: {agent}")
     
     
-    # 9. Test: Get all tasks we have knowledge of
-    print("\n get all tasks we have knowledge of:")
-    tasks = kg.get_tasks_whom_we_have_knowledge_of()
-    print(f"Tasks we have knowledge of: {tasks}")
+    # # 9. Test: Get all tasks we have knowledge of
+    # print("\n get all tasks we have knowledge of:")
+    # tasks = kg.get_tasks_whom_we_have_knowledge_of()
+    # print(f"Tasks we have knowledge of: {tasks}")
 
-    print("\n--- FINAL KNOWLEDGE GRAPH STATE ---")
-    print_all_atoms(kg.metta)
+    # print("\n--- FINAL KNOWLEDGE GRAPH STATE ---")
+    # print_all_atoms(kg.metta)

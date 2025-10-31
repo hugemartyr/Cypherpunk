@@ -27,21 +27,45 @@ from uagents_core.contrib.protocols.chat import (
 import subprocess
 import sys
 import os
-import re  # Added for regex matching
-import time # Added for startup timeout
-import atexit # Added for cleanup on exit
-import signal # Added for cleanup on Ctrl+C
-import psutil # New dependency: pip install psutil
+import re  
+import time 
+import atexit 
+import signal 
+import psutil 
 from typing import Dict, Any, List
 
-# (Assuming 'logger', 'MODELS_DIR', 'curr_port', 
-# 'generate_persistent_runner_content' are defined elsewhere in your file)
+from specialist_agent_runner_script import generate_persistent_runner_content
+from transient_runner_script import generate_transient_runner_content
 
-# --- Process Cleanup Setup ---
+# --- Configuration ---
+dotenv.load_dotenv()
+logger = logging.getLogger("HFManagerAgent")
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-# Global list to track child processes for cleanup
+# Agent Configuration
+AGENT_SEED = os.getenv("HF_MANAGER_SEED", "hf_manager_agent_secret_seed_phrase_abc")
+AGENT_PORT = int(os.getenv("HF_MANAGER_PORT", "8000"))
+
+# ASI:One API Configuration
+API_KEY = os.getenv("ASI_ONE_API_KEY")
+BASE_URL = "https://api.asi1.ai/v1/chat/completions"
+MODEL_NAME = "asi1-mini" # Use the mini model
+
+if not API_KEY:
+    logger.error("FATAL ERROR: ASI_ONE_API_KEY environment variable is not set.")
+    sys.exit(1)
+
+# Define the directory for persistent models relative to this script
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "Agent_Models")) 
+os.makedirs(MODELS_DIR, exist_ok=True)
+curr_port = 6000 + 1 # Start ports for specialists after the manager's port
+
+
+
+# --- Child Process Management ---
 child_processes: List[psutil.Process] = []
-
 def cleanup_child_processes():
     """
     Terminates all child processes started by this script.
@@ -77,43 +101,10 @@ def signal_handler(sig, frame):
     # The atexit handler will automatically run
     sys.exit(0)
 
-# Register the signal handler
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-# --- Configuration ---
-dotenv.load_dotenv()
-
-# Set up logging
-logger = logging.getLogger("HFManagerAgent")
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-# Agent Configuration
-AGENT_SEED = os.getenv("HF_MANAGER_SEED", "hf_manager_agent_secret_seed_phrase_abc")
-AGENT_PORT = int(os.getenv("HF_MANAGER_PORT", "8000")) # Use a different port than specialists
-
-# ASI:One API Configuration
-API_KEY = os.getenv("ASI_ONE_API_KEY")
-BASE_URL = "https://api.asi1.ai/v1/chat/completions"
-MODEL_NAME = "asi1-mini" # Use the mini model
-
-if not API_KEY:
-    logger.error("FATAL ERROR: ASI_ONE_API_KEY environment variable is not set.")
-    sys.exit(1)
-
-# Define the directory for persistent models relative to this script
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-MODELS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "Agent_Models")) # Persistent models go here
-os.makedirs(MODELS_DIR, exist_ok=True)
-
-# Port counter for persistent agents
-# curr_port = AGENT_PORT + 1 # Start ports for specialists after the manager's port
-curr_port = 6000 + 1 # Start ports for specialists after the manager's port
-from specialist_agent_runner_script import generate_persistent_runner_content
-from transient_runner_script import generate_transient_runner_content
-
-
-
+# --- Data Models for ORC Agent Communication ---
 class HFManagerChat(Model):
     ChatMessage: ChatMessage
     caller_Agent_address: str
@@ -127,18 +118,11 @@ def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> 
     Executes Path A: Transient Run (single-use inference).
     Logs all subprocess output (stdout and stderr) for debugging.
     """
-    
-    # --- MODIFICATION ---
-    # Removed the incorrect repr() and manual quoting lines.
-    # The `generate_transient_runner_content` function is solely responsible
-    # for safely embedding these variables into the script.
-    model_id = model_id.replace('"', '') # Keep sanitization
-    # --- END MODIFICATION ---
 
-    # We use the original, unquoted variables here
+    model_id = model_id.replace('"', '') 
     print(f"[DEBUG] Running transient model: {model_id} with prompt: {prompt} and task_type: {task_type}")
-    filename = f"hf_transient_runner_{uuid4()}.py" # Unique filename
-    runner_path = os.path.join(SCRIPT_DIR, filename) # Place in script dir
+    filename = f"hf_transient_runner_{uuid4()}.py" 
+    runner_path = os.path.join(SCRIPT_DIR, filename)
     logger.info(f"Starting transient run for {model_id} with script {filename}")
     
     try:
@@ -179,7 +163,6 @@ def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> 
 
         logger.info(f"Transient run subprocess finished for {model_id}.")
         
-        # Attempt to parse JSON output
         try:
             output_json = json.loads(stdout)
             if isinstance(output_json, dict) and "status" not in output_json:
@@ -187,9 +170,7 @@ def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> 
             logger.info(f"Transient run successful for {model_id}.")
             return output_json
         except json.JSONDecodeError:
-            # This is why we log stdout above
             logger.error(f"Transient runner output for {model_id} was NOT valid JSON.")
-            # Return the raw output so the agent can see what went wrong
             return {"status": "error", "message": "Failed to decode JSON response from script.", "raw_output": stdout}
 
     except subprocess.TimeoutExpired:
@@ -214,10 +195,8 @@ def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, An
     Starts a long-running specialist agent as a subprocess,
     captures its address, and ensures it's cleaned up on exit.
     """
-    
-    # Sanitize input (assign the result back)
-    model_id = model_id.replace('"', '')
 
+    model_id = model_id.replace('"', '')
     print(f"[DEBUG] Running persistent model: {model_id} with task_type: {task_type}")
     global curr_port
     port_to_use = curr_port
@@ -377,6 +356,7 @@ run_persistent_model_schema={
 
 tools_list = [run_transient_model_schema, run_persistent_model_schema]
 
+
 # Available functions map for execution
 available_tools = {
     "run_transient_model": run_transient_model,
@@ -395,7 +375,6 @@ chat_proto = Protocol(spec=chat_protocol_spec)
 conversations: Dict[str, List[Dict[str, Any]]] = {}
 
 # --- Agent Event Handlers ---
-
 @agent.on_event('startup')
 async def startup_handler(ctx: Context):
     ctx.logger.info(f'My name is {ctx.agent.name} and my address is {ctx.agent.address}')
@@ -404,10 +383,12 @@ async def startup_handler(ctx: Context):
 # handle chat from normal User
 @chat_proto.on_message(ChatMessage)
 async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
-    session_id = sender # Use sender address as session identifier
-
-    id = -1
-
+    """
+    Handle incoming chat messages from users.
+    Maintains conversation history per session.
+    Interacts with ASI:One API to process messages and execute tools as needed.
+    """
+    session_id = sender 
     # Initialize conversation history if it's a new session
     if session_id not in conversations:
         logger.info(f"New conversation started with {sender}")
@@ -482,6 +463,11 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                             "name": func_name,
                             "content": json.dumps(result) # Ensure content is a JSON string
                         })
+                        
+                        # send the response back to user
+                        await ctx.send(sender, ChatMessage(content=[TextContent(type="text", text=json.dumps(result['output'] if 'output' in result else result))]))
+                        conversations.pop(session_id, None)
+                        return # Exit after tool execution and response
 
                     except json.JSONDecodeError:
                         logger.error(f"Failed to decode arguments for tool {func_name}: {args_str}")
@@ -495,17 +481,12 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
                             "tool_call_id": tool_call_id, "role": "tool", "name": func_name,
                             "content": json.dumps({"status": "error", "message": f"Tool execution failed: {str(e)}"})
                         })
-
-                # Add tool results to history for the next LLM call
                 conversations[session_id].extend(tool_outputs)
-                # Continue the loop to let the LLM process the tool results
-
-            # No tool calls, LLM gave a final answer
             else:
                 final_answer = response_message.get("content")
                 logger.info(f"LLM provided final answer: {final_answer}")
-                # Send the final answer back to the user
                 await ctx.send(sender, ChatMessage(content=[TextContent(type="text", text=final_answer)]))
+                
                 # Optional: Clear conversation history after final answer?
                 # conversations.pop(session_id, None)
                 return # Exit the loop and handler
@@ -530,8 +511,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     await ctx.send(sender, ChatMessage(content=[TextContent(type="text", text="Sorry, I couldn't complete the request within the allowed steps.")]))
     # Clean up history for the session
     conversations.pop(session_id, None)
-
- 
     
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
@@ -539,10 +518,13 @@ async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledge
 
 
 # handle messages from ORC agent
-# --- Corrected Message Handlers ---
 @new_chat_protocol.on_message(HFManagerChat)
 async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManagerChat):
-
+    """
+    Handle messages from the Orchestrator (ORC) agent.
+    Expects commands in the format:
+    <generate> <type> <model_id> <prompt/task>
+    where <type> is either 'transient' or 'persistent'."""
     print(f"[DEBUG] Handling message from ORC agent: {msg}")
 
     # 1. Get the command text
@@ -600,9 +582,8 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
                 if(new_deployed_agent_address != "unknown_address"):
                     response_text = f"Hugging Face Persistent Model Agent started at address: {new_deployed_agent_address} for model {model_id}"
                     logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
-                    await ctx.send(sender, #ORC agent
+                    await ctx.send(sender, # ORC agent : Send Agent address back
                                    HFManagerChat(ChatMessage= ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
-
                 
             else:
                 error_msg = f"Error: Unknown tool type '{tool_type}'. Must be 'transient' or 'persistent'."
@@ -621,24 +602,9 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
         # Send response directly to the original caller
         logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
         await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=response_text)]))
+        
+    return    
     
-    elif tool_type == "persistent":
-        # persistent tool call
-        pass
-
-        # generate a sub process that runs the persistent agent
-        # and return the address of the new deployed agent
-        
-        
-        
-        
-        
-    # Send confirmation/result back to the ORC agent
-    # logger.info(f"Sending response to ORC agent {sender}: {response_text}")
-    # await ctx.send(sender, HFManagerChat(ChatMessage=ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
-
-    # The 'conversations' dictionary and cleanup are no longer needed for this logic.
-
 
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)
 async def handle_acknowledgement_of_Manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):

@@ -27,16 +27,17 @@ from uagents_core.contrib.protocols.chat import (
 # Import our MeTTa Knowledge Graph
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
-THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
+
 
 # --- Agent Configuration ---
-
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_2"
+THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
+AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_5"
 API_KEY = os.getenv("ASI_ONE_API_KEY")
+print(f"Using ASI-1 API Key: {API_KEY is not None}")
 BASE_URL = "https://api.asi1.ai/v1/chat/completions"
 MODEL = "asi1-mini"
 
-AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENTVERSE_MAILBOX_KEY")
+# AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENTVERSE_MAILBOX_KEY")
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
@@ -60,7 +61,12 @@ kg = OrchestratorKnowledgeGraph()
 new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 
+
+
 hf_manager_address = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
+### Change accordingly
+
+
 
 class HFManagerChat(Model):
     ChatMessage: ChatMessage
@@ -212,7 +218,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             )
             
             # 5. Check if usage count meets the threshold to deploy
-            if new_count == THRESHOLD_TO_DEPLOY_NEW_AGENT: 
+            if new_count == THRESHOLD_TO_DEPLOY_NEW_AGENT: # to deploy only once
                 ctx.logger.info(f"Usage threshold ({THRESHOLD_TO_DEPLOY_NEW_AGENT}) reached!")
                 
                 # [ACTION] Tell HF_agent (our deploy tool) to deploy this model
@@ -228,17 +234,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                     )
                 )
                 
-                
-                # here we will recieve message from HF_agent about new deployed agent address
-                
-                
-                # # Simulate a new address and update the knowledge graph
-                # new_agent_address = f"agent1q...simulated-addr-for-new-agent"
-                # kg.register_specialist_agent(model_id, new_agent_address)
-                
-                # ctx.logger.info(f"New agent registered in MeTTa: {new_agent_address}")
-                # response_text_2 = f"generate a persistant chat model with HF model_id = '{model_id}' and task_type = 'auto' and give me the address of new deployed agent."
-                # await ctx.send(hf_manager_address, create_text_chat(response_text_2))
+
     
     else:
         # --- PATH 2: No, I don't have knowledge ---
@@ -247,9 +243,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         # [ACTION] Search Hugging Face Hub for the best model for this task
         ctx.logger.info(f"[ACTION] Searching Hugging Face Hub for '{task}'...")
         
-        
-        
-        
+    
         # Simulate finding a new model
         simulated_new_model = f"hf-hub/new-model-for-{task}"
         ctx.logger.info(f"Found new model: {simulated_new_model}")
@@ -264,136 +258,118 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         await ctx.send(sender, create_text_chat(response_text))
 
 
-def register_agent_with_agentverse(
-    agent_address: str,
-    bearer_token: str,
-    port: int,
-    agent_name: str,
-    description: str,
-    readme_content: str = None
-):
-    """
-    Connects a local agent to its Agentverse mailbox and updates its
-    public profile on agentverse.ai.
-    """
-    if not bearer_token:
-        print("AGENTVERSE_API_KEY not set, skipping registration.")
-        return
+# def register_agent_with_agentverse(
+#     agent_name: str,
+#     agent_address: str,
+#     bearer_token: str,
+#     port: int,
+#     description: str = "",
+#     readme_content: str = None,
+# ):
+#     """
+#     Connects a local agent to its Agentverse mailbox and updates its
+#     public profile on agentverse.ai.
+#     """
 
-    print(f"Agent '{agent_name}' starting registration...")
+#     if not bearer_token:
+#         print("AGENTVERSE_API_KEY not set, skipping registration.")
+#         return
 
-    # Give the agent's local server time to start up
-    # This is crucial for the /connect call
-    time.sleep(8)
+#     print(f"Agent '{agent_name}' starting registration...")
+#     time.sleep(8)
 
-    headers = {
-        "Authorization": f"Bearer {bearer_token}",
-        "Content-Type": "application/json",
-    }
+#     headers = {
+#         "Authorization": f"Bearer {bearer_token}",
+#         "Content-Type": "application/json",
+#     }
 
-    # --- Step 1: Connect agent's local server to the mailbox ---
-    connect_url = f"http://127.0.0.1:{port}/connect"
-    connect_payload = {
-        "agent_type": "mailbox",
-        "user_token": bearer_token
-    }
+#     # --- Step 1: Connect local mailbox ---
+#     connect_url = f"http://127.0.0.1:{port}/connect"
+#     connect_payload = {"agent_type": "mailbox", "user_token": bearer_token}
+#     connect_response = requests.post(connect_url, json=connect_payload, headers=headers, timeout=10)
+#     print(f"[DEBUG] /connect status: {connect_response.status_code} - {connect_response.text}")
 
-    try:
-        connect_response = requests.post(
-            connect_url, json=connect_payload, headers=headers, timeout=10
-        )
-        if connect_response.status_code in [200, 201]:
-            print(f"Successfully connected '{agent_name}' to Agentverse mailbox.")
-        else:
-            print(
-                f"Failed to connect '{agent_name}' to mailbox: "
-                f"{connect_response.status_code} - {connect_response.text}"
-            )
-            # Don't stop, agent might already be connected.
-            # Try to register/update anyway.
-    except Exception as e:
-        print(f"Error connecting '{agent_name}' to Agentverse: {str(e)}")
-        print("Will still attempt to register/update profile...")
-    
-    # --- Step 2: Register agent (creates profile if it doesn't exist) ---
-    print(f"Registering '{agent_name}' with Agentverse API...")
-    register_url = "https://agentverse.ai/v1/agents"
-    register_payload = {
-        "address": agent_address,
-        "agent_type": "mailbox"
-    }
+#     # --- Step 2: Request challenge ---
+#     challenge_url = f"https://agentverse.ai/v1/agents/challenge/{agent_address}"
+#     challenge_response = requests.get(challenge_url, headers=headers, timeout=10)
 
-    try:
-        requests.post(
-            register_url, json=register_payload, headers=headers, timeout=10
-        )
-        # We ignore the response. If it's 200/201 (created) or 409 (conflict),
-        # it's fine. We just want to ensure it exists before updating.
-    except Exception as e:
-        print(f"Error during initial registration (continuing to update): {str(e)}")
+#     if challenge_response.status_code != 200:
+#         print(f"Failed to get challenge: {challenge_response.status_code} - {challenge_response.text}")
+#         return
 
-    # --- Step 3: Update agent's public profile (README, etc.) ---
-    print(f"Updating '{agent_name}' README on Agentverse...")
-    update_url = f"https://agentverse.ai/v1/agents/{agent_address}"
+#     challenge = challenge_response.json().get("challenge")
+#     print(f"[DEBUG] Challenge received: {challenge}")
 
-    # Use default README if none provided
-    if not readme_content:
-        readme_content = f"""
-# {agent_name}
-{description}
+#     # --- Step 3: Sign challenge locally ---
+#     sign_url = f"http://127.0.0.1:{port}/sign"
+#     sign_payload = {"message": challenge}
+#     sign_response = requests.post(sign_url, json=sign_payload, headers=headers, timeout=10)
 
-This is a Orchestrator Agent that manages Hugging Face models.
-- **Address:** `{agent_address}`
-- **Protocols:** ChatProtocol
-"""
+#     if sign_response.status_code != 200:
+#         print(f"Failed to sign challenge: {sign_response.status_code} - {sign_response.text}")
+#         return
 
-    update_payload = {
-        "name": agent_name,
-        "readme": readme_content,
-        "short_description": description,
-    }
+#     challenge_sig = sign_response.json().get("signature")
+#     print(f"[DEBUG] Challenge signature: {challenge_sig}")
 
-    try:
-        update_response = requests.put(
-            update_url, json=update_payload, headers=headers, timeout=10
-        )
-        if update_response.status_code == 200:
-            print(f"Successfully updated '{agent_name}' profile on Agentverse.")
-        else:
-            print(
-                f"Failed to update '{agent_name}' profile: "
-                f"{update_response.status_code} - {update_response.text}"
-            )
-    except Exception as e:
-        print(f"Error updating '{agent_name}' profile: {str(e)}")
+#     # --- Step 4: Register agent ---
+#     register_url = "https://agentverse.ai/v1/agents"
+#     register_payload = {
+#         "address": agent_address,
+#         "agent_type": "mailbox",
+#         "challenge": challenge,
+#         "challenge_response": challenge_sig,
+#     }
 
-    print(f"Agent '{agent_name}' registration complete!")
+#     register_response = requests.post(register_url, json=register_payload, headers=headers, timeout=10)
+#     print(f"[DEBUG] /agents status: {register_response.status_code} - {register_response.text}")
 
+#     # --- Step 5: Update profile ---
+#     update_url = f"https://agentverse.ai/v1/agents/{agent_address}"
 
+#     if not readme_content:
+#         readme_content = f"""
+# # {agent_name}
+# {description}
 
+# This is an Orchestrator Agent that manages Hugging Face models.
+# - **Address:** `{agent_address}`
+# - **Protocols:** ChatProtocol
+# """
 
-@agent.on_event("startup")
-async def startup_handler(ctx: Context):
-    """Handles agent startup and triggers registration."""
-    ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
-    ctx.logger.info(f"Local server running on port: {AGENT_PORT}")
+#     update_payload = {
+#         "name": agent_name,
+#         "readme": readme_content,
+#         "short_description": description,
+#     }
+
+#     update_response = requests.put(update_url, json=update_payload, headers=headers, timeout=10)
+#     print(f"[DEBUG] /update status: {update_response.status_code} - {update_response.text}")
+
+#     print(f"Agent '{agent_name}' registration complete!\n")
+
+# @agent.on_event("startup")
+# async def startup_handler(ctx: Context):
+#     """Handles agent startup and triggers registration."""
+#     ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
+#     ctx.logger.info(f"Local server running on port: {AGENT_PORT}")
 
    
-    agent_info = {
-        "agent_address": ctx.agent.address,
-        "bearer_token": AGENT_MAILBOX_BEARER_TOKEN,
-        "port": AGENT_PORT,
-        "agent_name": ctx.agent.name,
-        "description": "An Orchestrator agent To Manage Hugging Face models.",
-        "readme_content": None,
-    }
+#     # agent_info = {
+#     #     "agent_address": ctx.agent.address,
+#     #     "bearer_token": AGENT_MAILBOX_BEARER_TOKEN,
+#     #     "port": AGENT_PORT,
+#     #     "agent_name": ctx.agent.name,
+#     #     "description": "An Orchestrator agent To Manage Hugging Face models.",
+#     #     "readme_content": None,
+#     # }
 
-    # Run registration in a separate thread to avoid blocking the agent
-    registration_thread = threading.Thread(
-        target=register_agent_with_agentverse,
-        kwargs=agent_info
-    )
-    registration_thread.start()
+#     # # Run registration in a separate thread to avoid blocking the agent
+#     # registration_thread = threading.Thread(
+#     #     target=register_agent_with_agentverse,
+#     #     kwargs=agent_info
+#     # )
+#     # registration_thread.start()
 
 # --- Agent Message Handlers ---
 @chat_proto.on_message(ChatMessage)
@@ -456,7 +432,7 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
                     ctx.logger.info(f"New agent address: {new_agent_address} for model: {model_id}")
                     # add address to metta kg
                     kg.register_specialist_agent(model_id, new_agent_address)
-                    print("\n\n\n\n")
+                    print("\n\n ---------Updated Knowledge Graph---------\n\n")
                     print_all_atoms(kg.metta)
                     print("\n\n\n\n")
 

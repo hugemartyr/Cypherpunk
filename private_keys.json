@@ -2,5 +2,13 @@
     "Agent1": {
         "identity_key": "d223089a34473557f9678a351467a5b711d2aecb52c05752d3433b533fabbeb3",
         "wallet_key": "3zHWjmXl1bGniaNaVFpeX7gEpcSZYHSAYzD4FzeySAo="
+    },
+    "Simple Agent to Test HF Agent": {
+        "identity_key": "a25d77bf792dfeacdd53309228cc5c84984c2bbf60bf663dc306fd9006f5b947",
+        "wallet_key": "gmelrt4QCL4mQ2fSSNMGWVzFu1jKC3iz27rHv2Ap4o4="
+    },
+    "Simple Agent to Test ORC and HF Agents": {
+        "identity_key": "aeab125640d3aed7a6c795bceaf9924fd5711bf81db3ba27dbe3f03deaa307d7",
+        "wallet_key": "u8AcxLZAsgnIrghKbpii1oGXqP7WKgtmD15wQFutvho="
     }
 }
