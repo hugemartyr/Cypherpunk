@@ -4,3 +4,6 @@ python-dotenv
 psutil
 torch
 transformers
+hyperon>=0.2.8
+accelerate>=0.23.0 
+safetensors>=0.4.0
