@@ -2,10 +2,12 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
+import threading
 from uuid import uuid4
 from uagents import Agent, Context, Model, Protocol
 from uagents.setup import fund_agent_if_low
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -29,11 +31,12 @@ THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
 
 # --- Agent Configuration ---
 
-AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_1"
+AGENT_SEED = "hf_orchestrator_agent_secret_seed_phrase_2"
 API_KEY = os.getenv("ASI_ONE_API_KEY")
 BASE_URL = "https://api.asi1.ai/v1/chat/completions"
 MODEL = "asi1-mini"
 
+AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENTVERSE_MAILBOX_KEY")
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
@@ -46,7 +49,9 @@ agent = Agent(
     name="hf_orchestrator_agent",
     seed=AGENT_SEED,
     port=AGENT_PORT,
-    endpoint=[f"http://localhost:{AGENT_PORT}/submit"] # Assuming local for now
+    endpoint=[f"http://localhost:{AGENT_PORT}/submit"], # Assuming local for now,
+    mailbox=True
+    
 )
 kg = OrchestratorKnowledgeGraph()
 
@@ -258,6 +263,137 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         response_text = f"Found new model '{simulated_new_model}' on HF Hub. [Simulating call: Running model locally...]"
         await ctx.send(sender, create_text_chat(response_text))
 
+
+def register_agent_with_agentverse(
+    agent_address: str,
+    bearer_token: str,
+    port: int,
+    agent_name: str,
+    description: str,
+    readme_content: str = None
+):
+    """
+    Connects a local agent to its Agentverse mailbox and updates its
+    public profile on agentverse.ai.
+    """
+    if not bearer_token:
+        print("AGENTVERSE_API_KEY not set, skipping registration.")
+        return
+
+    print(f"Agent '{agent_name}' starting registration...")
+
+    # Give the agent's local server time to start up
+    # This is crucial for the /connect call
+    time.sleep(8)
+
+    headers = {
+        "Authorization": f"Bearer {bearer_token}",
+        "Content-Type": "application/json",
+    }
+
+    # --- Step 1: Connect agent's local server to the mailbox ---
+    connect_url = f"http://127.0.0.1:{port}/connect"
+    connect_payload = {
+        "agent_type": "mailbox",
+        "user_token": bearer_token
+    }
+
+    try:
+        connect_response = requests.post(
+            connect_url, json=connect_payload, headers=headers, timeout=10
+        )
+        if connect_response.status_code in [200, 201]:
+            print(f"Successfully connected '{agent_name}' to Agentverse mailbox.")
+        else:
+            print(
+                f"Failed to connect '{agent_name}' to mailbox: "
+                f"{connect_response.status_code} - {connect_response.text}"
+            )
+            # Don't stop, agent might already be connected.
+            # Try to register/update anyway.
+    except Exception as e:
+        print(f"Error connecting '{agent_name}' to Agentverse: {str(e)}")
+        print("Will still attempt to register/update profile...")
+    
+    # --- Step 2: Register agent (creates profile if it doesn't exist) ---
+    print(f"Registering '{agent_name}' with Agentverse API...")
+    register_url = "https://agentverse.ai/v1/agents"
+    register_payload = {
+        "address": agent_address,
+        "agent_type": "mailbox"
+    }
+
+    try:
+        requests.post(
+            register_url, json=register_payload, headers=headers, timeout=10
+        )
+        # We ignore the response. If it's 200/201 (created) or 409 (conflict),
+        # it's fine. We just want to ensure it exists before updating.
+    except Exception as e:
+        print(f"Error during initial registration (continuing to update): {str(e)}")
+
+    # --- Step 3: Update agent's public profile (README, etc.) ---
+    print(f"Updating '{agent_name}' README on Agentverse...")
+    update_url = f"https://agentverse.ai/v1/agents/{agent_address}"
+
+    # Use default README if none provided
+    if not readme_content:
+        readme_content = f"""
+# {agent_name}
+{description}
+
+This is a Orchestrator Agent that manages Hugging Face models.
+- **Address:** `{agent_address}`
+- **Protocols:** ChatProtocol
+"""
+
+    update_payload = {
+        "name": agent_name,
+        "readme": readme_content,
+        "short_description": description,
+    }
+
+    try:
+        update_response = requests.put(
+            update_url, json=update_payload, headers=headers, timeout=10
+        )
+        if update_response.status_code == 200:
+            print(f"Successfully updated '{agent_name}' profile on Agentverse.")
+        else:
+            print(
+                f"Failed to update '{agent_name}' profile: "
+                f"{update_response.status_code} - {update_response.text}"
+            )
+    except Exception as e:
+        print(f"Error updating '{agent_name}' profile: {str(e)}")
+
+    print(f"Agent '{agent_name}' registration complete!")
+
+
+
+
+@agent.on_event("startup")
+async def startup_handler(ctx: Context):
+    """Handles agent startup and triggers registration."""
+    ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
+    ctx.logger.info(f"Local server running on port: {AGENT_PORT}")
+
+   
+    agent_info = {
+        "agent_address": ctx.agent.address,
+        "bearer_token": AGENT_MAILBOX_BEARER_TOKEN,
+        "port": AGENT_PORT,
+        "agent_name": ctx.agent.name,
+        "description": "An Orchestrator agent To Manage Hugging Face models.",
+        "readme_content": None,
+    }
+
+    # Run registration in a separate thread to avoid blocking the agent
+    registration_thread = threading.Thread(
+        target=register_agent_with_agentverse,
+        kwargs=agent_info
+    )
+    registration_thread.start()
 
 # --- Agent Message Handlers ---
 @chat_proto.on_message(ChatMessage)
