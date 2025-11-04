@@ -21,7 +21,7 @@ agent1 = Agent(
 
 agent_address_to_send_message = "agent1q04wcekamg3rzekxhnmh776jmkhlkd0s2p5dqpum7nz8ff6jd5yhvwprta3"
 
-prompt= "generate transient text-summarization history of agentic AI in brief using gpt2 model from hugging face, use necessary tools, just use tool and don't suggest any other logic"
+prompt= "generate transient summarization history of agentic AI in brief using gpt2 model from hugging face, use necessary tools, just use tool and don't suggest any other logic"
 
 
 

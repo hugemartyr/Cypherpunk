@@ -1,6 +1,10 @@
 
+
+import threading
 import sys, json, os, time, torch, signal, warnings, select
 from transformers import pipeline
+import requests
+
 warnings.filterwarnings('ignore')
 from uagents.setup import fund_agent_if_low
 
@@ -19,8 +23,8 @@ from uagents_core.contrib.protocols.chat import (
 # === Configuration ===
 MODEL_ID = "gpt2"
 TASK_TYPE = "auto"
-PORT = 8005
-SEED_PHRASE = f"{MODEL_ID}_seed_phrase_12345"
+PORT = 7603
+SEED_PHRASE = f"{MODEL_ID}_seed_phrase_123457890112"
 
 class HFManagerChat(Model):
     ChatMessage: ChatMessage
@@ -29,6 +33,7 @@ class HFManagerChatAcknowledgement(Model):
     ChatAcknowledgement: ChatAcknowledgement
     caller_Agent_address: str
         
+AGENT_MAILBOX_BEARER_TOKEN="eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjQ4NzM3OTcsImlhdCI6MTc2MjI4MTc5NywiaXNzIjoiZmV0Y2guYWkiLCJqdGkiOiJiNjlkZWNhNTVhODk4NmZhMTQxNDAyODUiLCJzY29wZSI6ImF2Iiwic3ViIjoiZGY5NDllZWM0ODk1MTg5NjU5MmI3NDFkNjA2MmU1MjU0MWVlNGY2ZWU2NTU1MmI3In0.U3pvvM19LBxpy9RniuILWO8OY_QZLsl2vrQfvGJYu3QtvuZctsQQnAnjMoY34kAF7AycLL-gJXHmtnZdlSIvdpu5Jbx1QdJDpI4zwU34HYXNMxvC_WnZ46tD08Rl7EGDE_J2EgiF4RwAn1wrN70n5N1IrHVhDHBYBJsTytBFm9YrUPXwcWcRCHt0UDyGqNrpBGOaec2nb8LFnevLtwvwAXl4F__6CBuqwMfAx1MEz3mmOVu0ZwFfxAfbw8ruxUlhYcwDuUPK3LfNDmFRiFlc9qi9u0xiIeOqyeh6DrWCcuD7aVf5CIbaxTmonTts8pmT4o6mRHmDCuMYf0Bd493Q2g"
         
 # --- Path Configuration ---
 # Get the absolute path of the directory this script is in
@@ -41,6 +46,90 @@ LOG_FILE = os.path.join(SCRIPT_DIR, "log.txt")
 MODEL_CACHE_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "Model"))
 os.makedirs(MODEL_CACHE_DIR, exist_ok=True)
 # --- End Path Configuration ---
+
+def register_agent_with_agentverse(
+    agent_name: str,
+    agent_address: str,
+    bearer_token: str,
+    port: int,
+    description: str = "",
+    readme_content: str = None,
+):
+    port=PORT
+    
+
+    if not bearer_token:
+        print("AGENTVERSE_API_KEY not set, skipping registration.")
+        return
+
+    print(f"Agent '{agent_name}' starting registration...")
+    time.sleep(8)
+
+    headers = {
+        "Authorization": f"Bearer {bearer_token}",
+        "Content-Type": "application/json",
+    }
+
+    # --- Step 1: Connect local mailbox ---
+    connect_url = f"http://127.0.0.1:{port}/connect"
+    connect_payload = {"agent_type": "mailbox", "user_token": bearer_token}
+    connect_response = requests.post(connect_url, json=connect_payload, headers=headers, timeout=10)
+    print(f"[DEBUG] /connect status: {connect_response.status_code} - {connect_response.text}")
+
+    # --- Step 2: Request challenge ---
+    challenge_url = f"https://agentverse.ai/v1/agents/challenge/{agent_address}"
+    challenge_response = requests.get(challenge_url, headers=headers, timeout=10)
+
+    if challenge_response.status_code != 200:
+        print(f"Failed to get challenge: {challenge_response.status_code} - {challenge_response.text}")
+        return
+
+    challenge = challenge_response.json().get("challenge")
+    print(f"[DEBUG] Challenge received: {challenge}")
+
+    # --- Step 3: Sign challenge locally ---
+    sign_url = f"http://127.0.0.1:{port}/sign"
+    sign_payload = {"message": challenge}
+    sign_response = requests.post(sign_url, json=sign_payload, headers=headers, timeout=10)
+
+    if sign_response.status_code != 200:
+        print(f"Failed to sign challenge: {sign_response.status_code} - {sign_response.text}")
+        return
+
+    challenge_sig = sign_response.json().get("signature")
+    print(f"[DEBUG] Challenge signature: {challenge_sig}")
+
+    # --- Step 4: Register agent ---
+    register_url = "https://agentverse.ai/v1/agents"
+    register_payload = {
+        "address": agent_address,
+        "agent_type": "mailbox",
+        "challenge": challenge,
+        "challenge_response": challenge_sig,
+    }
+
+    register_response = requests.post(register_url, json=register_payload, headers=headers, timeout=10)
+    print(f"[DEBUG] /agents status: {register_response.status_code} - {register_response.text}")
+
+    # --- Step 5: Update profile ---
+    update_url = f"https://agentverse.ai/v1/agents/{agent_address}"
+
+    if not readme_content:
+        readme_content = "This is an Specialist Agent that manages Hugging Face models."
+
+
+    update_payload = {
+        "name": agent_name,
+        "readme": readme_content,
+        "short_description": description,
+    }
+
+    update_response = requests.put(update_url, json=update_payload, headers=headers, timeout=10)
+    print(f"[DEBUG] /update status: {update_response.status_code} - {update_response.text}")
+
+    print(f"Agent '{agent_name}' registration complete!")
+
+
 
 # Global variable to hold the model pipeline
 pipe = None
@@ -73,7 +162,8 @@ agent = Agent(
     name=f"{MODEL_ID}_specialist_agent",
     seed=SEED_PHRASE,
     port=PORT,
-    endpoint=[f"http://localhost:{PORT}/submit"] # Example endpoint, change if using cloudflared
+    # endpoint=[f"http://localhost:{PORT}/submit"] # Example endpoint, change if using cloudflared
+    mailbox=True
 )
 
 # Initialize the chat protocol
@@ -202,6 +292,28 @@ async def handle_message_hf_agent(ctx: Context, sender: str, msg: HFManagerChat)
 async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
     
     ctx.logger.info(f"Got an acknowledgement from {sender} for {msg.ChatAcknowledgement.acknowledged_msg_id}")
+    
+@agent.on_event("startup")
+async def startup_handler(ctx: Context):
+    # Handles agent startup and triggers registration.
+    ctx.logger.info(f"My name is {ctx.agent.name} and my address is {ctx.agent.address}")
+    ctx.logger.info(f"Local server running on port: {PORT}")
+   
+    agent_info = {
+        "agent_address": ctx.agent.address,
+        "bearer_token": AGENT_MAILBOX_BEARER_TOKEN,
+        "port": PORT,
+        "agent_name": ctx.agent.name,
+        "description": "An Specialist agent To Manage Hugging Face models.",
+        "readme_content": None,
+    }
+
+    # Run registration in a separate thread to avoid blocking the agent
+    registration_thread = threading.Thread(
+        target=register_agent_with_agentverse,
+        kwargs=agent_info
+    )
+    registration_thread.start()    
 
 
 fund_agent_if_low(agent.wallet.address())
@@ -211,5 +323,4 @@ agent.include(new_chat_protocol, publish_manifest=True)
 
 if __name__ == '__main__':
     agent.run()
-
 

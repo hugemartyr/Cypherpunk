@@ -44,11 +44,11 @@ logger = logging.getLogger("HFManagerAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Agent Configuration
-AGENT_SEED = "hf_manager_agent_secret_seed_phrase_absfskfwchjkwjcfdwdndwwf"
+AGENT_SEED = "hf_manager_agent_secret_seed_phrase_bdwdiwjfojdwja"
 AGENT_PORT = int(os.getenv("HF_MANAGER_PORT", "8007"))
 
 
-AGENT_MAILBOX_BEARER_TOKEN=os.getenv("AGENT_MAILBOX_BEARER_TOKEN")
+AGENT_MAILBOX_BEARER_TOKEN="eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjQ4NzM3OTcsImlhdCI6MTc2MjI4MTc5NywiaXNzIjoiZmV0Y2guYWkiLCJqdGkiOiJiNjlkZWNhNTVhODk4NmZhMTQxNDAyODUiLCJzY29wZSI6ImF2Iiwic3ViIjoiZGY5NDllZWM0ODk1MTg5NjU5MmI3NDFkNjA2MmU1MjU0MWVlNGY2ZWU2NTU1MmI3In0.U3pvvM19LBxpy9RniuILWO8OY_QZLsl2vrQfvGJYu3QtvuZctsQQnAnjMoY34kAF7AycLL-gJXHmtnZdlSIvdpu5Jbx1QdJDpI4zwU34HYXNMxvC_WnZ46tD08Rl7EGDE_J2EgiF4RwAn1wrN70n5N1IrHVhDHBYBJsTytBFm9YrUPXwcWcRCHt0UDyGqNrpBGOaec2nb8LFnevLtwvwAXl4F__6CBuqwMfAx1MEz3mmOVu0ZwFfxAfbw8ruxUlhYcwDuUPK3LfNDmFRiFlc9qi9u0xiIeOqyeh6DrWCcuD7aVf5CIbaxTmonTts8pmT4o6mRHmDCuMYf0Bd493Q2g"
 
 # ASI:One API Configuration
 API_KEY = os.getenv("ASI_ONE_API_KEY")
@@ -64,7 +64,7 @@ if not API_KEY:
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "Agent_Models")) 
 os.makedirs(MODELS_DIR, exist_ok=True)
-curr_port = 6000 + 1 # Start ports for specialists after the manager's port
+curr_port = 7602 + 1 # Start ports for specialists after the manager's port
 
 
 
@@ -192,7 +192,6 @@ def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> 
             except OSError as e:
                 logger.warning(f"Could not remove transient script {filename}: {e}")
                 
- 
 def run_persistent_model(model_id: str, task_type: str = "auto") -> Dict[str, Any]:
     """
     Executes Path B: Persistent Run.
@@ -360,8 +359,6 @@ run_persistent_model_schema={
 
 tools_list = [run_transient_model_schema, run_persistent_model_schema]
 
-
-
 def register_agent_with_agentverse(
     agent_name: str,
     agent_address: str,
@@ -453,8 +450,6 @@ This is an Orchestrator Agent that manages Hugging Face models.
 
     print(f"Agent '{agent_name}' registration complete!\n")
 
-
-
 # Available functions map for execution
 available_tools = {
     "run_transient_model": run_transient_model,
@@ -472,12 +467,6 @@ agent = Agent(
 new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 conversations: Dict[str, List[Dict[str, Any]]] = {}
-
-# --- Agent Event Handlers ---
-# @agent.on_event('startup')
-# async def startup_handler(ctx: Context):
-#     ctx.logger.info(f'My name is {ctx.agent.name} and my address is {ctx.agent.address}')
-#     ctx.logger.info(f'Agent running on http://localhost:{AGENT_PORT}')
 
 # handle chat from normal User
 @chat_proto.on_message(ChatMessage)
@@ -614,7 +603,6 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
-
 
 # handle messages from ORC agent
 @new_chat_protocol.on_message(HFManagerChat)
