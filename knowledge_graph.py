@@ -53,11 +53,14 @@ class OrchestratorKnowledgeGraph:
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (model-for-task "image-generation" "high-quality") "stabilityai/sdxl-turbo")'
         ))
+        # self.metta.space().add_atom(self.metta.parse_single(
+        #     '(= (model-for-task "text-generation" "default") "microsoft/Phi-3-mini-4k-instruct")'
+        # ))
         self.metta.space().add_atom(self.metta.parse_single(
-            '(= (model-for-task "text-generation" "default") "microsoft/Phi-3-mini-4k-instruct")'
+            '(= (model-for-task "text-summarization" "default") "t5-small")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
-            '(= (model-for-task "text-summarization" "default") "gpt2")'
+            '(= (model-for-task "text-generation" "default") "gpt2")'
         ))
         self.metta.space().add_atom(self.metta.parse_single(
             '(= (model-for-task "sentiment-analysis" "default") "distilbert/distilbert-base-uncased-finetuned-sst-2-english")'

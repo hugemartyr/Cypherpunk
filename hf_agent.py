@@ -3,19 +3,21 @@ import sys
 import subprocess
 import json
 import threading
-from typing import Dict, Any, List
 import time
 import signal
 import requests
 import dotenv
 import logging
 from uuid import uuid4
+import re  
+import atexit 
+import psutil 
 from datetime import datetime, timezone
+from typing import Dict, Any, List
+
 
 from uagents import Agent, Protocol, Context, Model
 from uagents.setup import fund_agent_if_low
-
-# Import the necessary components from the chat protocol
 from uagents_core.contrib.protocols.chat import (
     ChatAcknowledgement,
     ChatMessage,
@@ -25,15 +27,7 @@ from uagents_core.contrib.protocols.chat import (
     chat_protocol_spec,
 )
 
-import subprocess
-import sys
-import os
-import re  
-import time 
-import atexit 
-import signal 
-import psutil 
-from typing import Dict, Any, List
+
 
 from specialist_agent_runner_script import generate_persistent_runner_content
 from transient_runner_script import generate_transient_runner_content
@@ -46,9 +40,13 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(level
 # Agent Configuration
 AGENT_SEED = "hf_manager_agent_secret_seed_phrase_bdwdiwjfojdwja"
 AGENT_PORT = int(os.getenv("HF_MANAGER_PORT", "8007"))
+    
 
 
-AGENT_MAILBOX_BEARER_TOKEN="eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjQ4NzM3OTcsImlhdCI6MTc2MjI4MTc5NywiaXNzIjoiZmV0Y2guYWkiLCJqdGkiOiJiNjlkZWNhNTVhODk4NmZhMTQxNDAyODUiLCJzY29wZSI6ImF2Iiwic3ViIjoiZGY5NDllZWM0ODk1MTg5NjU5MmI3NDFkNjA2MmU1MjU0MWVlNGY2ZWU2NTU1MmI3In0.U3pvvM19LBxpy9RniuILWO8OY_QZLsl2vrQfvGJYu3QtvuZctsQQnAnjMoY34kAF7AycLL-gJXHmtnZdlSIvdpu5Jbx1QdJDpI4zwU34HYXNMxvC_WnZ46tD08Rl7EGDE_J2EgiF4RwAn1wrN70n5N1IrHVhDHBYBJsTytBFm9YrUPXwcWcRCHt0UDyGqNrpBGOaec2nb8LFnevLtwvwAXl4F__6CBuqwMfAx1MEz3mmOVu0ZwFfxAfbw8ruxUlhYcwDuUPK3LfNDmFRiFlc9qi9u0xiIeOqyeh6DrWCcuD7aVf5CIbaxTmonTts8pmT4o6mRHmDCuMYf0Bd493Q2g"
+AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENT_MAILBOX_BEARER_TOKEN")
+if not AGENT_MAILBOX_BEARER_TOKEN:
+    logger.error("FATAL ERROR: AGENT_MAILBOX_BEARER_TOKEN environment variable is not set.")
+    sys.exit(1)
 
 # ASI:One API Configuration
 API_KEY = os.getenv("ASI_ONE_API_KEY")
@@ -59,12 +57,10 @@ if not API_KEY:
     logger.error("FATAL ERROR: ASI_ONE_API_KEY environment variable is not set.")
     sys.exit(1)
 
-# Define the directory for persistent models relative to this script
-
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "Agent_Models")) 
 os.makedirs(MODELS_DIR, exist_ok=True)
-curr_port = 7602 + 1 # Start ports for specialists after the manager's port
+curr_port = 7605 # Starting port for persistent agents
 
 
 
@@ -108,14 +104,7 @@ def signal_handler(sig, frame):
 signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
-# --- Data Models for ORC Agent Communication ---
-class HFManagerChat(Model):
-    ChatMessage: ChatMessage
-    caller_Agent_address: str
 
-class HFManagerChatAcknowledgement(Model):
-    ChatAcknowledgement: ChatAcknowledgement
-    caller_Agent_address: str
 
 def run_transient_model(model_id: str, prompt: str, task_type: str = "auto") -> Dict[str, Any]:
     """
@@ -359,6 +348,12 @@ run_persistent_model_schema={
 
 tools_list = [run_transient_model_schema, run_persistent_model_schema]
 
+# Available functions map for execution
+available_tools = {
+    "run_transient_model": run_transient_model,
+    "run_persistent_model": run_persistent_model,
+}
+
 def register_agent_with_agentverse(
     agent_name: str,
     agent_address: str,
@@ -450,20 +445,14 @@ This is an Orchestrator Agent that manages Hugging Face models.
 
     print(f"Agent '{agent_name}' registration complete!\n")
 
-# Available functions map for execution
-available_tools = {
-    "run_transient_model": run_transient_model,
-    "run_persistent_model": run_persistent_model,
-}
-
 # --- Agent Definition ---
 agent = Agent(
     name="HF_MANAGEMENT_AGENT",
     seed=AGENT_SEED,
     port=AGENT_PORT,
-    # endpoint=[f"http://localhost:{AGENT_PORT}/submit"], # Manager agent endpoint
     mailbox=True
 )
+
 new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
 chat_proto = Protocol(spec=chat_protocol_spec)
 conversations: Dict[str, List[Dict[str, Any]]] = {}
@@ -600,10 +589,23 @@ async def handle_message(ctx: Context, sender: str, msg: ChatMessage):
     # Clean up history for the session
     conversations.pop(session_id, None)
     
+    
+    
 @chat_proto.on_message(ChatAcknowledgement)
 async def handle_acknowledgement(ctx: Context, sender: str, msg: ChatAcknowledgement):
     ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.acknowledged_msg_id}")
 
+
+# --- Data Models for ORC Agent Communication ---
+class HFManagerChat(Model):
+    ChatMessage: ChatMessage
+    caller_Agent_address: str
+
+class HFManagerChatAcknowledgement(Model):
+    ChatAcknowledgement: ChatAcknowledgement
+    caller_Agent_address: str
+    
+    
 # handle messages from ORC agent
 @new_chat_protocol.on_message(HFManagerChat)
 async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManagerChat):
@@ -616,7 +618,6 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
 
     # 1. Get the command text
     try:
-        # Assuming the command is in the first content block
         command_text = msg.ChatMessage.content[0].text.strip()
         logger.info(f"Received command from {sender}: {command_text}")
     except (IndexError, AttributeError):
@@ -657,11 +658,7 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
                 else:
                     error_msg = "Error: 'transient' tool requires a prompt. Expected: <generate> transient <model_id> <prompt>"
                     
-                    
-            
             elif tool_type == "persistent":
-                # Note: This ignores parts[3] (the prompt) if provided,
-                # as the persistent tool doesn't take one.
                 repr(model_id)
                 tool_result =  run_persistent_model(model_id=model_id)
                 
@@ -670,8 +667,10 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
                     response_text = f"Hugging Face Persistent Model Agent started at address: {new_deployed_agent_address} for model {model_id}"
                     logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
                     await ctx.send(sender, # ORC agent : Send Agent address back
-                                   HFManagerChat(ChatMessage= ChatMessage(content=[TextContent(text=response_text)]), caller_Agent_address=msg.caller_Agent_address))
-                
+                                   HFManagerChat(
+                                       ChatMessage= ChatMessage(content=[TextContent(text=response_text)]), 
+                                       caller_Agent_address=msg.caller_Agent_address)
+                                   )
             else:
                 error_msg = f"Error: Unknown tool type '{tool_type}'. Must be 'transient' or 'persistent'."
 
@@ -682,24 +681,19 @@ async def handle_message_from_orc_agent(ctx: Context, sender: str, msg: HFManage
     # 4. Formulate and send the response
     if tool_result:
         response_text = f"Hugging Face Model Response: {tool_result.get('output', 'No result string.')}"
+    
     else:
         response_text = error_msg or "Error: An unknown error occurred."
 
     if tool_type == "transient":
-        # Send response directly to the original caller
         logger.info(f"Sending response to original caller {msg.caller_Agent_address}: {response_text}")
         await ctx.send(msg.caller_Agent_address, ChatMessage(content=[TextContent(text=response_text)]))
         
     return    
-    
 
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)
 async def handle_acknowledgement_of_Manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
     ctx.logger.debug(f"Received acknowledgement from {sender} for message: {msg.ChatAcknowledgement.acknowledged_msg_id}")
-
-fund_agent_if_low(agent.wallet.address())
-agent.include(chat_proto, publish_manifest=True)
-agent.include(new_chat_protocol, publish_manifest=True)
 
 @agent.on_event("startup")
 async def startup_handler(ctx: Context):
@@ -722,6 +716,13 @@ async def startup_handler(ctx: Context):
         kwargs=agent_info
     )
     registration_thread.start()
+
+
+# --- Include Protocols and Start Agent ---
+fund_agent_if_low(agent.wallet.address())
+agent.include(chat_proto, publish_manifest=True)
+agent.include(new_chat_protocol, publish_manifest=True)
+
 
 if __name__ == "__main__":
     logger.info(f"Starting HF Manager Agent on port {AGENT_PORT}...")

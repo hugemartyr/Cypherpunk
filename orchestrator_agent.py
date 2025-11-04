@@ -2,19 +2,18 @@ import logging
 import os
 import re
 from datetime import datetime, timezone
-# import threading
 from uuid import uuid4
 from uagents import Agent, Context, Model, Protocol
 from uagents.setup import fund_agent_if_low
 from dotenv import load_dotenv
 import time
-
+from fastapi import FastAPI
+import requests
 import threading
+import sys
 
 load_dotenv()
 
-from fastapi import FastAPI
-import requests
 
 # Import the chat protocol specification
 from uagents_core.contrib.protocols.chat import (
@@ -30,7 +29,6 @@ from uagents_core.contrib.protocols.chat import (
 from knowledge_graph import OrchestratorKnowledgeGraph, print_all_atoms
 
 
-
 # --- Agent Configuration ---
 THRESHOLD_TO_DEPLOY_NEW_AGENT = 2
 hf_manager_address = "agent1qvn0mn5w0xcpquycluc04xfj98zdc20d7axfzkuytysm7eqk80hs6fwslmu" ### Change accordingly
@@ -42,33 +40,32 @@ print(f"Using ASI-1 API Key: {API_KEY is not None}")
 BASE_URL = "https://api.asi1.ai/v1/chat/completions"
 MODEL = "asi1-mini"
 
-# AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENTVERSE_MAILBOX_KEY")
+
 
 # Set up logging
 logger = logging.getLogger("OrchestratorAgent")
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
 # Initialize Agent and Knowledge Graph
-# agent = Agent(name="hf_orchestrator_agent", seed=AGENT_SEED,port=8001)
-AGENT_PORT = 8035
+AGENT_PORT = 8008
 agent = Agent(
     name="hf_orchestrator_agent",
     seed=AGENT_SEED,
     port=AGENT_PORT,
-    # endpoint=[f"http://localhost:{AGENT_PORT}/submit"],
     mailbox=True
     
 )
 kg = OrchestratorKnowledgeGraph()
 
-
-
-# --- Chat Protocol Setup (from your example) ---
-new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0")
+# --- Chat Protocol Setup  ---
+new_chat_protocol = Protocol("AgentChatProtocol", "0.3.0") # for HF Manager Agent communication
 chat_proto = Protocol(spec=chat_protocol_spec)
 
+AGENT_MAILBOX_BEARER_TOKEN = os.getenv("AGENT_MAILBOX_BEARER_TOKEN")
+if not AGENT_MAILBOX_BEARER_TOKEN:
+    logger.error("FATAL ERROR: AGENT_MAILBOX_BEARER_TOKEN environment variable is not set.")
+    sys.exit(1)
 
-AGENT_MAILBOX_BEARER_TOKEN="eyJhbGciOiJSUzI1NiJ9.eyJleHAiOjE3NjQ4NzM3OTcsImlhdCI6MTc2MjI4MTc5NywiaXNzIjoiZmV0Y2guYWkiLCJqdGkiOiJiNjlkZWNhNTVhODk4NmZhMTQxNDAyODUiLCJzY29wZSI6ImF2Iiwic3ViIjoiZGY5NDllZWM0ODk1MTg5NjU5MmI3NDFkNjA2MmU1MjU0MWVlNGY2ZWU2NTU1MmI3In0.U3pvvM19LBxpy9RniuILWO8OY_QZLsl2vrQfvGJYu3QtvuZctsQQnAnjMoY34kAF7AycLL-gJXHmtnZdlSIvdpu5Jbx1QdJDpI4zwU34HYXNMxvC_WnZ46tD08Rl7EGDE_J2EgiF4RwAn1wrN70n5N1IrHVhDHBYBJsTytBFm9YrUPXwcWcRCHt0UDyGqNrpBGOaec2nb8LFnevLtwvwAXl4F__6CBuqwMfAx1MEz3mmOVu0ZwFfxAfbw8ruxUlhYcwDuUPK3LfNDmFRiFlc9qi9u0xiIeOqyeh6DrWCcuD7aVf5CIbaxTmonTts8pmT4o6mRHmDCuMYf0Bd493Q2g"
 
 class HFManagerChat(Model):
     ChatMessage: ChatMessage
@@ -76,7 +73,6 @@ class HFManagerChat(Model):
 class HFManagerChatAcknowledgement(Model):
     ChatAcknowledgement: ChatAcknowledgement
     caller_Agent_address: str
-    
 
 
 def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
@@ -89,13 +85,12 @@ def create_text_chat(text: str, end_session: bool = False) -> ChatMessage:
         msg_id=uuid4(),
         content=content,
     )
+    
 def create_text_hf_agent_chat(text: str, caller_agent_address: str, end_session: bool = False) -> HFManagerChat:
     """
     Helper function to create a text chat message for the HFManagerAgent.
-
     """
     content = [TextContent(type="text", text=text)]
-    
     return HFManagerChat(
         ChatMessage=ChatMessage(
             timestamp=datetime.utcnow(),
@@ -104,6 +99,7 @@ def create_text_hf_agent_chat(text: str, caller_agent_address: str, end_session:
         ),  
         caller_Agent_address=caller_agent_address
     )
+
 
 # --- Agent's Core Logic ---
 def parse_user_query(user_query: str) -> (str | None, str | None):
@@ -149,16 +145,37 @@ def parse_user_query(user_query: str) -> (str | None, str | None):
         return task, prompt
     return None, None
 
-async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):    
+async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg: OrchestratorKnowledgeGraph):
+    """
+    Main logic for the orchestrator agent.
+    
+    ----Flowchart Overview----
+    1. Parse the user's intent from the free-text query.
+    2. Check MeTTa if it has knowledge of this task.
+        - If yes:
+            a. Check if a specialist agent exists for this model.
+                - If yes: Pass prompt to that agent.
+                - If no:
+                    i. Increment usage count for this model.
+                    ii. Tell HF_agent (our local tool) to build and run the model.
+                    iii. Check if usage count meets the threshold to deploy.
+                        - If yes: Tell HF_agent (our deploy tool) to deploy this model.
+        - If no:
+            a. Query Agentverse for related models.
+            b. Respond to user with suggestions or simulate new model creation.
+            
+    """
+    
+    
     # 1. Parse the user's intent
     task, prompt = parse_user_query(user_query)
-    
     if not task:
         logger.warning(f"Could not parse task from query: {user_query}")
         await ctx.send(sender, create_text_chat(f"Sorry, I don't understand. Please use the format: 'generate <task> <prompt>'"))
         return
     
     ctx.logger.info(f"Parsed query: task='{task}', prompt='{prompt[:20]}...'")
+    
     
     # --- Start Flowchart ---
     
@@ -181,12 +198,9 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             repr(specialist_agent)
             specialist_agent = specialist_agent.replace('"','')
             
-            # [ACTION] Pass prompt to that agent
             ctx.logger.info(f"[ACTION] Forwarding prompt to specialist agent: {specialist_agent}")
             response_text = f"{prompt}"
-            ctx.logger.info(f"[ACTION] Sending {prompt} to specialist agent: {specialist_agent}")
-            # await ctx.send(specialist_agent, create_text_hf_agent_chat(response_text, caller_agent_address=sender))
-            initial_message = HFManagerChat(
+            message = HFManagerChat(
                 ChatMessage=ChatMessage(
                     timestamp=datetime.utcnow(),
                     msg_id=uuid4(),
@@ -195,7 +209,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                 caller_Agent_address=sender
             )
             try:
-                await ctx.send(specialist_agent, initial_message)
+                await ctx.send(specialist_agent, message)
                 ctx.logger.info(f"Prompt sent to specialist agent: {specialist_agent}")
             except Exception as e:
                 ctx.logger.error(f"Error sending prompt to specialist agent: {e}")
@@ -208,32 +222,24 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
             new_count = kg.increment_usage_count(model_id)
             ctx.logger.info(f"Incremented usage count for '{model_id}' to: {new_count}")
 
-            # [ACTION] Tell HF_agent (our local tool) to build and run the model
-            ctx.logger.info(f"[ACTION] Calling local 'hf_tool' to run '{model_id}'...")
             response_text = f"generate transient {model_id} '{prompt}'"
-            # await ctx.send(hf_manager_address, create_text_chat(response_text))
             transient_command = f"<generate> transient {model_id} {prompt}"
-    
             ctx.logger.info(f"Sending command: {transient_command}")
             
             ctx.logger.info(f"Sending command to HF Manager at address: {hf_manager_address}")
-            
-            try:
-                await ctx.send(
-                    hf_manager_address, 
-                    create_text_hf_agent_chat(
-                        text=transient_command, 
-                        caller_agent_address=sender
-                    )
+            await ctx.send(
+                hf_manager_address, 
+                create_text_hf_agent_chat(
+                    text=transient_command, 
+                    caller_agent_address=sender
                 )
-            except Exception as e:
-                ctx.logger.error(f"Error sending command to hf_manager_address: {e}")
+            )
+    
 
             # 5. Check if usage count meets the threshold to deploy
             if new_count == THRESHOLD_TO_DEPLOY_NEW_AGENT: # to deploy only once
                 ctx.logger.info(f"Usage threshold ({THRESHOLD_TO_DEPLOY_NEW_AGENT}) reached!")
-                
-                # [ACTION] Tell HF_agent (our deploy tool) to deploy this model
+    
                 ctx.logger.info(f"[ACTION] Calling 'provisioner.py' to deploy new agent for '{model_id}'...")
                 persistent_command = f"<generate> persistent {model_id}"
     
@@ -249,7 +255,6 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
 
     
     else:
-        
         # --- Step 1: Query Agentverse for related models ---
         try:
             # search agentverse for related models
@@ -284,6 +289,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
                     f"Failed to query Agentverse (HTTP {response.status_code}). "
                     f"Simulating a fallback model for '{task}'."
                 )
+                
         except Exception as e:
             ctx.logger.error(f"Agentverse search failed: {e}")
             response_text = f"Could not reach Agentverse. Simulating new model for '{task}'."
@@ -292,6 +298,7 @@ async def main_orchestrator_logic(ctx: Context, sender: str, user_query: str, kg
         await ctx.send(sender, create_text_chat(response_text))
 
 
+# --- Agent Registration with Agentverse ---
 def register_agent_with_agentverse(
     agent_name: str,
     agent_address: str,
@@ -383,8 +390,6 @@ This is an Orchestrator Agent that manages Hugging Face models.
 
     print(f"Agent '{agent_name}' registration complete!\n")
 
-
-
 @agent.on_event("startup")
 async def startup_handler(ctx: Context):
     """Handles agent startup and triggers registration."""
@@ -406,7 +411,6 @@ async def startup_handler(ctx: Context):
         kwargs=agent_info
     )
     registration_thread.start()
-    
 
 # --- Agent Message Handlers ---
 @chat_proto.on_message(ChatMessage)
@@ -474,7 +478,6 @@ async def handle_message_hf_manager(ctx: Context, sender: str, msg: HFManagerCha
                     print_all_atoms(kg.metta)
                     print("\n\n\n\n")
 
-
 @new_chat_protocol.on_message(HFManagerChatAcknowledgement)
 async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAcknowledgement):
     """Handle chat acknowledgements."""
@@ -484,13 +487,12 @@ async def handle_ack_of_manager(ctx: Context, sender: str, msg: HFManagerChatAck
 # Register the protocol
 agent.include(chat_proto, publish_manifest=True)
 agent.include(new_chat_protocol, publish_manifest=True)
-
-
 fund_agent_if_low(agent.wallet.address())
+
+
 
 if __name__ == "__main__":
     pass
-    # To run the actual agent (uncomment this):
     logger.info(f"Starting agent '{agent.name}' on address: {agent.address}")
     agent.run()
 

@@ -107,9 +107,9 @@ The **HF Agent** executes the selected model, retrieves the output, and sends it
 
 ---
 
-## Video Proof on AgentVerse Chat
+## Presentation Video with Technical Demo
 
-https://youtu.be/Aqm-WSrQym8
+https://youtu.be/gqfTiS0Qqpc?si=-NByGYMqRjMIZObH
 
 ---
 
