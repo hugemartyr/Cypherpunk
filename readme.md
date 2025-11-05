@@ -113,6 +113,12 @@ https://youtu.be/gqfTiS0Qqpc?si=-NByGYMqRjMIZObH
 
 ---
 
+## Hosting in server
+
+We have also tried hosting in server but the problem is in free tier any service won't give us that much RAM which is required to download and load the HF model, Given high computing servers the scripts are easy to deploy and perfectly run on agentverse
+
+---
+
 ## Run Summary
 
 | Step | File                    | Description                       |

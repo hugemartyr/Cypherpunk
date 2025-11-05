@@ -51,6 +51,7 @@ def execute_hf_model(model_id, prompt, task_type):
         
         device = 0 if torch.cuda.is_available() else -1
         print(f"[DEBUG] Using device: {{device}} (0=CUDA, -1=CPU)", file=sys.stderr)
+        print("[DEBUG] Loading pipeline...This may takes time to download the model", file=sys.stderr)
 
         if task_type == "auto":
             print("[DEBUG] Auto-detecting pipeline...", file=sys.stderr)
